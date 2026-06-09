@@ -228,4 +228,59 @@ paths:
           description: Position not found
         '500':
           description: Internal server error
+  /applications/{id}/stage:
+    put:
+      summary: Update the interview stage of an application
+      description: Updates the current interview step for a specific application.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Application ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentInterviewStep:
+                  type: integer
+                  description: ID of the new interview step
+              required:
+                - currentInterviewStep
+      responses:
+        '200':
+          description: Application stage updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  application:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      candidateId:
+                        type: integer
+                      positionId:
+                        type: integer
+                      currentInterviewStep:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+        '400':
+          description: Invalid input (bad application ID, missing or invalid currentInterviewStep, interview step not found)
+        '404':
+          description: Application not found
+        '500':
+          description: Internal server error
 
