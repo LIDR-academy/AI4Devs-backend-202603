@@ -1,0 +1,2 @@
+## Prompt 1.
+Actúa como un ingeniero de software para revisar todo el codebase y generar un fichero agents.md para el frontend y otro para el backend. Sigue los estándares definidos en https://agents.md/ Si tienes cualquier duda hazme las preguntas necesarias
