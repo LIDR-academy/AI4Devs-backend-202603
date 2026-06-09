@@ -40,18 +40,22 @@ export const getPositionCandidates = async (
 ): Promise<PositionCandidate[]> => {
     const position = await prisma.position.findUnique({
         where: { id: positionId },
+        select: { id: true },
     });
 
     if (!position) {
         throw positionNotFoundError();
     }
 
+    // Select only the columns the response needs. Using `select` (instead of
+    // `include`) keeps the query efficient and avoids reading unrelated columns.
     const applications = await prisma.application.findMany({
         where: { positionId },
-        include: {
-            candidate: true,
-            interviewStep: true,
-            interviews: true,
+        select: {
+            id: true,
+            candidate: { select: { id: true, firstName: true, lastName: true } },
+            interviewStep: { select: { name: true } },
+            interviews: { select: { score: true } },
         },
     });
 
