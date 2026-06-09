@@ -1,8 +1,16 @@
+import prisma from '../../infrastructure/prismaClient';
 import { Candidate } from '../../domain/models/Candidate';
 import { validateCandidateData } from '../validator';
 import { Education } from '../../domain/models/Education';
 import { WorkExperience } from '../../domain/models/WorkExperience';
 import { Resume } from '../../domain/models/Resume';
+
+export type UpdateStageResult = {
+  id: number;
+  candidateId: number;
+  positionId: number;
+  currentInterviewStep: { id: number; name: string };
+};
 
 export const addCandidate = async (candidateData: any) => {
     try {
@@ -62,4 +70,57 @@ export const findCandidateById = async (id: number): Promise<Candidate | null> =
         console.error('Error al buscar el candidato:', error);
         throw new Error('Error al recuperar el candidato');
     }
+};
+
+export const updateCandidateStage = async (
+    candidateId: number,
+    applicationId: number,
+    currentInterviewStep: number
+): Promise<UpdateStageResult> => {
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } });
+    if (!candidate) {
+        const err: any = new Error('Candidate not found');
+        err.status = 404;
+        throw err;
+    }
+
+    const application = await prisma.application.findFirst({
+        where: { id: applicationId, candidateId },
+        include: { position: { select: { interviewFlowId: true } } },
+    });
+    if (!application) {
+        const err: any = new Error('Application not found');
+        err.status = 404;
+        throw err;
+    }
+
+    const validStep = await prisma.interviewStep.findFirst({
+        where: {
+            id: currentInterviewStep,
+            interviewFlowId: application.position.interviewFlowId,
+        },
+    });
+    if (!validStep) {
+        const err: any = new Error('Interview step is not valid for this position');
+        err.status = 400;
+        throw err;
+    }
+
+    const updated = await prisma.application.update({
+        where: { id: applicationId },
+        data: { currentInterviewStep },
+        select: {
+            id: true,
+            candidateId: true,
+            positionId: true,
+            interviewStep: { select: { id: true, name: true } },
+        },
+    });
+
+    return {
+        id: updated.id,
+        candidateId: updated.candidateId,
+        positionId: updated.positionId,
+        currentInterviewStep: updated.interviewStep,
+    };
 };
