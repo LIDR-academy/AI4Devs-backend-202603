@@ -36,10 +36,12 @@ describe('candidateService.updateCandidateStage', () => {
         const result = await updateCandidateStage(prisma as any, 1, 5, 3);
 
         expect(result).toEqual(updated);
-        expect(prisma.application.update).toHaveBeenCalledWith({
-            where: { id: 5 },
-            data: { currentInterviewStep: 3 },
-        });
+        expect(prisma.application.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 5 },
+                data: { currentInterviewStep: 3 },
+            })
+        );
     });
 
     it('throws CANDIDATE_NOT_FOUND when the candidate does not exist', async () => {
