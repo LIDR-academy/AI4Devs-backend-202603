@@ -152,6 +152,118 @@ paths:
           description: Bad request (invalid input data)
         '500':
           description: Internal server error
+  /candidates/{id}/stage:
+    put:
+      summary: Update a candidate's application interview stage
+      description: >
+        Updates the current interview stage of a candidate's application,
+        supporting drag-and-drop in a kanban UI. Only
+        `application.currentInterviewStep` is changed; no Interview records
+        are created.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Candidate identifier.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCandidateStageRequest'
+      responses:
+        '200':
+          description: Stage updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCandidateStageResponse'
+        '400':
+          description: >
+            Invalid candidate ID, missing/invalid body fields, or the target
+            interview step does not belong to the position's flow.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Interview step does not belong to this position's flow
+        '404':
+          description: Candidate not found, or application not linked to candidate.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Application not found
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Internal server error
+  /positions/{id}/candidates:
+    get:
+      summary: List candidates in process for a position
+      description: >
+        Returns all candidates currently in process for the given position,
+        one row per application, shaped for a kanban-style UI.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Position identifier.
+      responses:
+        '200':
+          description: List of candidates in process for the position.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PositionCandidate'
+        '400':
+          description: Invalid position ID.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid position ID
+        '404':
+          description: Position not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Position not found
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Internal server error
   /upload:
     post:
       summary: Upload a file
@@ -185,4 +297,79 @@ paths:
           description: Invalid file type, only PDF and DOCX are allowed
         '500':
           description: Error during the file upload process
+components:
+  schemas:
+    UpdateCandidateStageRequest:
+      type: object
+      required:
+        - applicationId
+        - currentInterviewStep
+      properties:
+        applicationId:
+          type: integer
+          description: Application to update (a candidate may have several).
+          example: 5
+        currentInterviewStep:
+          type: integer
+          description: Target InterviewStep id.
+          example: 3
+    UpdateCandidateStageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Candidate stage updated successfully
+        data:
+          type: object
+          description: The updated Application object.
+          properties:
+            id:
+              type: integer
+              example: 5
+            positionId:
+              type: integer
+              example: 1
+            candidateId:
+              type: integer
+              example: 1
+            applicationDate:
+              type: string
+              format: date-time
+            currentInterviewStep:
+              type: integer
+              example: 3
+            notes:
+              type: string
+              nullable: true
+    PositionCandidate:
+      type: object
+      properties:
+        fullName:
+          type: string
+          description: Candidate first and last name.
+          example: John Doe
+        currentInterviewStep:
+          type: string
+          description: Name of the candidate's current interview step.
+          example: Technical Interview
+        candidateId:
+          type: integer
+          description: Candidate identifier.
+          example: 1
+        applicationId:
+          type: integer
+          description: Application identifier.
+          example: 5
+        averageScore:
+          type: number
+          description: >
+            Arithmetic mean of the non-null interview scores for the
+            application; 0 when there are no scored interviews.
+          example: 4.5
+      required:
+        - fullName
+        - currentInterviewStep
+        - candidateId
+        - applicationId
+        - averageScore
 
