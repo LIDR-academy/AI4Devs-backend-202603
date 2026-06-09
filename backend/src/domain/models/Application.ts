@@ -50,4 +50,16 @@ export class Application {
         if (!data) return null;
         return new Application(data);
     }
+
+    // Actualiza únicamente la fase actual de la entrevista de esta aplicación.
+    async updateStage(currentInterviewStep: number) {
+        if (!this.id) {
+            throw new Error('Cannot update stage of an unsaved application');
+        }
+        this.currentInterviewStep = currentInterviewStep;
+        return await prisma.application.update({
+            where: { id: this.id },
+            data: { currentInterviewStep: currentInterviewStep },
+        });
+    }
 }

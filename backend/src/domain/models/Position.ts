@@ -83,5 +83,24 @@ export class Position {
         if (!data) return null;
         return new Position(data);
     }
+
+    // Devuelve las aplicaciones de la posición con el candidato, el step actual
+    // y las entrevistas (con su score) necesarios para el endpoint de candidatos.
+    static async findApplicationsWithCandidates(positionId: number) {
+        return await prisma.application.findMany({
+            where: { positionId: positionId },
+            include: {
+                candidate: {
+                    select: { id: true, firstName: true, lastName: true },
+                },
+                interviewStep: {
+                    select: { id: true, name: true },
+                },
+                interviews: {
+                    select: { score: true },
+                },
+            },
+        });
+    }
 }
 

@@ -105,3 +105,19 @@ export const validateCandidateData = (data: any) => {
         validateCV(data.cv);
     }
 };
+
+// Valida el body de PUT /candidates/:id/stage.
+// Requiere applicationId y currentInterviewStep como enteros positivos.
+export const validateStageUpdateData = (data: any) => {
+    if (!data || typeof data !== 'object') {
+        throw new Error('Invalid request body');
+    }
+
+    if (!Number.isInteger(data.applicationId) || data.applicationId <= 0) {
+        throw new Error('Invalid applicationId');
+    }
+
+    if (!Number.isInteger(data.currentInterviewStep) || data.currentInterviewStep <= 0) {
+        throw new Error('Invalid currentInterviewStep');
+    }
+};
