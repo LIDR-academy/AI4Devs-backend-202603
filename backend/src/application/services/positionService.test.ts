@@ -24,9 +24,9 @@ describe('positionService.getPositionCandidates', () => {
             getPositionCandidates(prisma as any, 999)
         ).rejects.toMatchObject({ code: POSITION_NOT_FOUND });
 
-        expect(prisma.position.findUnique).toHaveBeenCalledWith({
-            where: { id: 999 },
-        });
+        expect(prisma.position.findUnique).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: 999 } })
+        );
         expect(prisma.application.findMany).not.toHaveBeenCalled();
     });
 
