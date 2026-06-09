@@ -102,6 +102,7 @@ export const updateCandidateStage = async (
 ) => {
     const candidate = await prisma.candidate.findUnique({
         where: { id: candidateId },
+        select: { id: true },
     });
     if (!candidate) {
         throw codedError(CANDIDATE_NOT_FOUND, 'Candidate not found');
@@ -109,7 +110,11 @@ export const updateCandidateStage = async (
 
     const application = await prisma.application.findUnique({
         where: { id: applicationId },
-        include: { position: true },
+        select: {
+            id: true,
+            candidateId: true,
+            position: { select: { interviewFlowId: true } },
+        },
     });
     if (!application || application.candidateId !== candidateId) {
         throw codedError(APPLICATION_NOT_FOUND, 'Application not found');
@@ -117,6 +122,7 @@ export const updateCandidateStage = async (
 
     const interviewStep = await prisma.interviewStep.findUnique({
         where: { id: currentInterviewStep },
+        select: { interviewFlowId: true },
     });
     if (
         !interviewStep ||
@@ -131,5 +137,12 @@ export const updateCandidateStage = async (
     return prisma.application.update({
         where: { id: applicationId },
         data: { currentInterviewStep },
+        select: {
+            id: true,
+            positionId: true,
+            candidateId: true,
+            currentInterviewStep: true,
+            notes: true,
+        },
     });
 };
