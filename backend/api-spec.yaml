@@ -3,6 +3,15 @@ info:
   title: AI4Devs Candidate API
   version: 1.0.0
   description: API for managing candidate data in the AI4Devs recruitment system.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Signed JWT with payload { userId, role }, verified against JWT_SECRET.
+        Example role values: recruiter, admin.
 paths:
   /candidates:
     post:
@@ -150,6 +159,142 @@ paths:
                     type: object
         '400':
           description: Bad request (invalid input data)
+        '500':
+          description: Internal server error
+  /positions/{id}/candidates:
+    get:
+      summary: Get all candidates in process for a position
+      description: >
+        Returns every candidate currently in process for the given position,
+        including their full name, current interview step and the average of all
+        their interview scores (null when they have no scored interviews).
+      tags:
+        - Positions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric ID of the position.
+      responses:
+        '200':
+          description: Array of candidates in process (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    candidateId:
+                      type: integer
+                      example: 1
+                    applicationId:
+                      type: integer
+                      example: 12
+                    fullName:
+                      type: string
+                      example: John Doe
+                    currentInterviewStep:
+                      type: integer
+                      description: FK value of application.current_interview_step.
+                      example: 2
+                    currentInterviewStepName:
+                      type: string
+                      example: Technical Interview
+                    averageScore:
+                      type: number
+                      nullable: true
+                      example: 4.5
+              example:
+                - candidateId: 1
+                  applicationId: 12
+                  fullName: John Doe
+                  currentInterviewStep: 2
+                  currentInterviewStepName: Technical Interview
+                  averageScore: 4.5
+                - candidateId: 3
+                  applicationId: 14
+                  fullName: Carlos García
+                  currentInterviewStep: 1
+                  currentInterviewStepName: Initial Screening
+                  averageScore: null
+        '400':
+          description: Invalid position ID format
+        '401':
+          description: Authentication required
+        '404':
+          description: Position not found
+        '500':
+          description: Internal server error
+  /candidates/{id}/stage:
+    put:
+      summary: Update a candidate's Kanban stage
+      description: >
+        Moves a candidate to a new stage. A stage is the name of an interview
+        step that belongs to the position's interview flow. If the candidate has
+        more than one application, positionId must be supplied to choose which
+        application to update. Restricted to recruiter/admin roles.
+      tags:
+        - Candidates
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric ID of the candidate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newStage
+              properties:
+                newStage:
+                  type: string
+                  description: Target stage name (matched case-insensitively).
+                  example: Technical Interview
+                positionId:
+                  type: integer
+                  description: Required only when the candidate has multiple applications.
+                  example: 1
+            example:
+              newStage: Technical Interview
+              positionId: 1
+      responses:
+        '200':
+          description: Candidate stage updated successfully
+          content:
+            application/json:
+              example:
+                message: Candidate stage updated successfully
+                data:
+                  id: 1
+                  firstName: John
+                  lastName: Doe
+                  email: john.doe@gmail.com
+                  phone: '1234567890'
+                  address: 123 Main St
+                  applicationId: 12
+                  positionId: 1
+                  currentInterviewStep: 2
+                  currentInterviewStepName: Technical Interview
+        '400':
+          description: Invalid input, invalid stage, or ambiguous application
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Candidate or application not found
         '500':
           description: Internal server error
   /upload:

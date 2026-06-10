@@ -3,8 +3,11 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 import candidateRoutes from './routes/candidateRoutes';
+import positionRoutes from './routes/positionRoutes';
 import { uploadFile } from './application/services/fileUploadService';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './infrastructure/swagger';
 
 // Extender la interfaz Request para incluir prisma
 declare global {
@@ -36,8 +39,14 @@ app.use(cors({
   credentials: true
 }));
 
+// Swagger API documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Import and use candidateRoutes
 app.use('/candidates', candidateRoutes);
+
+// Position routes (Kanban candidate listing)
+app.use('/positions', positionRoutes);
 
 // Route for file uploads
 app.post('/upload', uploadFile);
