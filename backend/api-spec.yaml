@@ -1,102 +1,85 @@
 openapi: 3.0.0
 info:
-  title: AI4Devs Candidate API
-  version: 1.0.0
-  description: API for managing candidate data in the AI4Devs recruitment system.
+  title: LTI — Lean Talent Intelligence API
+  version: 1.1.0
+  description: >
+    REST API for the LTI Applicant Tracking System.
+    Backend: Express 4 + TypeScript · Hexagonal Architecture · Prisma ORM + PostgreSQL.
+  contact:
+    name: LTI Backend Team
+
+servers:
+  - url: http://localhost:3010
+    description: Local development server
+
+tags:
+  - name: System
+    description: Server health and status
+  - name: Candidates
+    description: Candidate management
+  - name: Positions
+    description: Job position and Kanban view
+  - name: Applications
+    description: Application stage management
+  - name: Files
+    description: CV file upload
+
 paths:
+
+  /:
+    get:
+      tags: [System]
+      summary: Healthcheck
+      description: Returns a plain-text confirmation that the server is running. Does not query the database.
+      responses:
+        '200':
+          description: Server is up
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Hola LTI!
+
   /candidates:
     post:
-      summary: Add a new candidate
-      description: Adds a new candidate to the system and returns the created candidate data.
+      tags: [Candidates]
+      summary: Create a new candidate
+      description: >
+        Creates a candidate record together with optional education history,
+        work experience and CV reference. Returns the created candidate wrapped
+        in a message envelope. Fails with 400 if the email already exists or any
+        validation rule is violated.
+
+        **Note on id bypass:** if the request body includes an `id` field with a
+        truthy value, all field validations are skipped and the candidate is
+        persisted as-is. This is intentional for update flows that reuse this
+        endpoint.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                firstName:
-                  type: string
-                  description: First name of the candidate
-                  minLength: 2
-                  maxLength: 50
-                  pattern: '^[a-zA-ZñÑáéíóúÁÉÍÓÚ ]+$'
-                lastName:
-                  type: string
-                  description: Last name of the candidate
-                  minLength: 2
-                  maxLength: 50
-                  pattern: '^[a-zA-ZñÑáéíóúÁÉÍÓÚ ]+$'
-                email:
-                  type: string
-                  description: Email address of the candidate
-                  pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-                phone:
-                  type: string
-                  description: Phone number of the candidate
-                  pattern: '^\+?\d{1,3}?[- .]?\(?(?:\d{2,3})\)?[- .]?\d\d\d[- .]?\d\d\d\d$'
-                address:
-                  type: string
-                  description: Address of the candidate
-                  maxLength: 100
-                educations:
-                  type: array
-                  description: Education history of the candidate
-                  items:
-                    type: object
-                    properties:
-                      institution:
-                        type: string
-                        description: Institution name
-                        maxLength: 100
-                      title:
-                        type: string
-                        description: Degree or title obtained
-                        maxLength: 100
-                      startDate:
-                        type: string
-                        description: Start date of the education
-                        pattern: '^\d{4}-\d{2}-\d{2}$'
-                      endDate:
-                        type: string
-                        description: End date of the education
-                        pattern: '^\d{4}-\d{2}-\d{2}$'
-                workExperiences:
-                  type: array
-                  description: Work experience of the candidate
-                  items:
-                    type: object
-                    properties:
-                      company:
-                        type: string
-                        description: Company name
-                        maxLength: 100
-                      position:
-                        type: string
-                        description: Position held
-                        maxLength: 100
-                      description:
-                        type: string
-                        description: Description of the job responsibilities
-                        maxLength: 200
-                      startDate:
-                        type: string
-                        description: Start date of the job
-                        pattern: '^\d{4}-\d{2}-\d{2}$'
-                      endDate:
-                        type: string
-                        description: End date of the job
-                        pattern: '^\d{4}-\d{2}-\d{2}$'
-                cv:
-                  type: object
-                  description: CV file information
-                  properties:
-                    filePath:
-                      type: string
-                      description: Path to the CV file
-                    fileType:
-                      type: string
-                      description: Type of the CV file
+              $ref: '#/components/schemas/CandidateInput'
+            example:
+              firstName: Ana
+              lastName: García
+              email: ana.garcia@ejemplo.com
+              phone: '612345678'
+              address: Calle Mayor 1, Madrid
+              educations:
+                - institution: Universidad Complutense
+                  title: Ingeniería Informática
+                  startDate: '2015-09-01'
+                  endDate: '2019-06-30'
+              workExperiences:
+                - company: Acme Corp
+                  position: Backend Developer
+                  description: API development with Node.js
+                  startDate: '2019-09-01'
+                  endDate: '2023-12-31'
+              cv:
+                filePath: uploads/1716900000000-cv_ana.pdf
+                fileType: application/pdf
       responses:
         '201':
           description: Candidate created successfully
@@ -105,68 +88,218 @@ paths:
               schema:
                 type: object
                 properties:
-                  id:
+                  message:
                     type: string
-                    description: Unique identifier for the candidate
-                  firstName:
-                    type: string
-                  lastName:
-                    type: string
-                  email:
-                    type: string
-                  phone:
-                    type: string
-                  address:
-                    type: string
-                  educations:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        institution:
-                          type: string
-                        title:
-                          type: string
-                        startDate:
-                          type: string
-                        endDate:
-                          type: string
-                  workExperiences:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        company:
-                          type: string
-                        position:
-                          type: string
-                        description:
-                          type: string
-                        startDate:
-                          type: string
-                        endDate:
-                          type: string
-                  cv:
-                    type: object
+                    example: Candidate added successfully
+                  data:
+                    $ref: '#/components/schemas/CandidateRecord'
         '400':
-          description: Bad request (invalid input data)
+          description: Validation error or duplicate email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                duplicateEmail:
+                  summary: Email already exists
+                  value:
+                    message: Error adding candidate
+                    error: The email already exists in the database
+                invalidName:
+                  summary: Invalid name format
+                  value:
+                    message: Error adding candidate
+                    error: Invalid name
+                invalidEmail:
+                  summary: Invalid email format
+                  value:
+                    message: Error adding candidate
+                    error: Invalid email
+
+  /candidates/{id}:
+    get:
+      tags: [Candidates]
+      summary: Get a candidate by ID
+      description: Returns the full candidate record including educations, work experiences, resumes and applications.
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Candidate found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidateRecord'
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          description: Candidate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorField'
+              example:
+                error: Candidate not found
         '500':
-          description: Internal server error
+          $ref: '#/components/responses/InternalError'
+
+  /candidates/{id}/stage:
+    post:
+      tags: [Applications]
+      summary: Update the interview stage of an application
+      description: >
+        Moves an Application to a new interview step in the hiring flow.
+        The path parameter `id` identifies the **Application**, not the Candidate.
+        Returns the updated application fields.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Application ID (Application.id, not Candidate.id)
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentInterviewStep
+              properties:
+                currentInterviewStep:
+                  type: integer
+                  minimum: 1
+                  description: ID of the target InterviewStep
+                  example: 3
+      responses:
+        '200':
+          description: Stage updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Stage updated successfully
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      candidateId:
+                        type: integer
+                        example: 2
+                      positionId:
+                        type: integer
+                        example: 4
+                      currentInterviewStep:
+                        type: integer
+                        example: 3
+        '400':
+          description: Invalid ID format or InterviewStep not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorField'
+              examples:
+                invalidId:
+                  value:
+                    error: Invalid ID format
+                stepNotFound:
+                  value:
+                    error: Interview step not found
+        '404':
+          description: Application not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorField'
+              example:
+                error: Application not found
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /positions/{id}/candidates:
+    get:
+      tags: [Positions]
+      summary: Get candidates in process for a position (Kanban view)
+      description: >
+        Returns the list of active applications for a given position,
+        with each candidate's full name, current interview step name and average
+        interview score. Designed to feed the Kanban board.
+        Returns an empty array if the position has no applications.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Position ID (Position.id)
+          example: 1
+      responses:
+        '200':
+          description: List of candidates (may be empty)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    fullName:
+                      type: string
+                      example: Ana García
+                    currentInterviewStep:
+                      type: string
+                      example: Entrevista técnica
+                    averageScore:
+                      type: number
+                      nullable: true
+                      example: 8.5
+              example:
+                - fullName: Ana García
+                  currentInterviewStep: Entrevista técnica
+                  averageScore: 8.5
+                - fullName: Luis Pérez
+                  currentInterviewStep: Revisión de CV
+                  averageScore: null
+        '400':
+          $ref: '#/components/responses/InvalidId'
+        '404':
+          description: Position not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorField'
+              example:
+                error: Position not found
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /upload:
     post:
-      summary: Upload a file
-      description: Uploads a file to the server. Only PDF and DOCX files are allowed.
+      tags: [Files]
+      summary: Upload a CV file
+      description: Uploads a CV file to the server. Only PDF and DOCX files are accepted. Returns the stored file path and MIME type.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
+              required:
+                - file
               properties:
                 file:
                   type: string
                   format: binary
-                  description: File to be uploaded
+                  description: CV file (PDF or DOCX only)
       responses:
         '200':
           description: File uploaded successfully
@@ -177,12 +310,262 @@ paths:
                 properties:
                   filePath:
                     type: string
-                    description: Path where the file is stored
+                    description: Server path where the file is stored
+                    example: uploads/1716900000000-cv_ana.pdf
                   fileType:
                     type: string
                     description: MIME type of the uploaded file
+                    example: application/pdf
         '400':
-          description: Invalid file type, only PDF and DOCX are allowed
+          description: Invalid file type — only PDF and DOCX are allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorField'
+              example:
+                error: Invalid file type
         '500':
-          description: Error during the file upload process
+          $ref: '#/components/responses/InternalError'
 
+components:
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: Numeric identifier
+      example: 1
+
+  schemas:
+
+    CandidateInput:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          pattern: '^[a-zA-ZñÑáéíóúÁÉÍÓÚ ]{2,50}$'
+          description: First name — letters and accented characters only
+          example: Ana
+        lastName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          pattern: '^[a-zA-ZñÑáéíóúÁÉÍÓÚ ]{2,50}$'
+          description: Last name — letters and accented characters only
+          example: García
+        email:
+          type: string
+          format: email
+          pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+          description: Unique email address
+          example: ana.garcia@ejemplo.com
+        phone:
+          type: string
+          pattern: '^(6|7|9)\d{8}$'
+          description: Spanish mobile/landline number (optional)
+          example: '612345678'
+        address:
+          type: string
+          maxLength: 100
+          description: Postal address (optional)
+          example: Calle Mayor 1, Madrid
+        educations:
+          type: array
+          description: Education history (optional)
+          items:
+            type: object
+            required:
+              - institution
+              - title
+              - startDate
+            properties:
+              institution:
+                type: string
+                minLength: 1
+                maxLength: 100
+                example: Universidad Complutense
+              title:
+                type: string
+                minLength: 1
+                maxLength: 100
+                example: Ingeniería Informática
+              startDate:
+                type: string
+                pattern: '^\d{4}-\d{2}-\d{2}$'
+                example: '2015-09-01'
+              endDate:
+                type: string
+                pattern: '^\d{4}-\d{2}-\d{2}$'
+                nullable: true
+                example: '2019-06-30'
+        workExperiences:
+          type: array
+          description: Work experience history (optional)
+          items:
+            type: object
+            required:
+              - company
+              - position
+              - startDate
+            properties:
+              company:
+                type: string
+                minLength: 1
+                maxLength: 100
+                example: Acme Corp
+              position:
+                type: string
+                minLength: 1
+                maxLength: 100
+                example: Backend Developer
+              description:
+                type: string
+                maxLength: 200
+                nullable: true
+                example: API development with Node.js
+              startDate:
+                type: string
+                pattern: '^\d{4}-\d{2}-\d{2}$'
+                example: '2019-09-01'
+              endDate:
+                type: string
+                pattern: '^\d{4}-\d{2}-\d{2}$'
+                nullable: true
+                example: '2023-12-31'
+        cv:
+          type: object
+          description: CV file reference (optional — use /upload first)
+          required:
+            - filePath
+            - fileType
+          properties:
+            filePath:
+              type: string
+              example: uploads/1716900000000-cv_ana.pdf
+            fileType:
+              type: string
+              example: application/pdf
+
+    CandidateRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        firstName:
+          type: string
+          example: Ana
+        lastName:
+          type: string
+          example: García
+        email:
+          type: string
+          example: ana.garcia@ejemplo.com
+        phone:
+          type: string
+          nullable: true
+          example: '612345678'
+        address:
+          type: string
+          nullable: true
+          example: Calle Mayor 1, Madrid
+        educations:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              institution:
+                type: string
+              title:
+                type: string
+              startDate:
+                type: string
+              endDate:
+                type: string
+                nullable: true
+        workExperiences:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              company:
+                type: string
+              position:
+                type: string
+              description:
+                type: string
+                nullable: true
+              startDate:
+                type: string
+              endDate:
+                type: string
+                nullable: true
+        resumes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              filePath:
+                type: string
+              fileType:
+                type: string
+        applications:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              positionId:
+                type: integer
+              currentInterviewStep:
+                type: integer
+
+    ErrorField:
+      type: object
+      properties:
+        error:
+          type: string
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        message:
+          type: string
+        error:
+          type: string
+
+  responses:
+    InvalidId:
+      description: Path parameter id is not a valid integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorField'
+          example:
+            error: Invalid ID format
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorField'
+          example:
+            error: Internal Server Error

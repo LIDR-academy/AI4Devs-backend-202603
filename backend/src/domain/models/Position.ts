@@ -1,7 +1,3 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
 export class Position {
     id?: number;
     companyId: number;
@@ -42,46 +38,4 @@ export class Position {
         this.applicationDeadline = data.applicationDeadline ? new Date(data.applicationDeadline) : undefined;
         this.contactInfo = data.contactInfo;
     }
-
-    async save() {
-        const positionData: any = {
-            companyId: this.companyId,
-            interviewFlowId: this.interviewFlowId,
-            title: this.title,
-            description: this.description,
-            status: this.status,
-            isVisible: this.isVisible,
-            location: this.location,
-            jobDescription: this.jobDescription,
-            requirements: this.requirements,
-            responsibilities: this.responsibilities,
-            salaryMin: this.salaryMin,
-            salaryMax: this.salaryMax,
-            employmentType: this.employmentType,
-            benefits: this.benefits,
-            companyDescription: this.companyDescription,
-            applicationDeadline: this.applicationDeadline,
-            contactInfo: this.contactInfo,
-        };
-
-        if (this.id) {
-            return await prisma.position.update({
-                where: { id: this.id },
-                data: positionData,
-            });
-        } else {
-            return await prisma.position.create({
-                data: positionData,
-            });
-        }
-    }
-
-    static async findOne(id: number): Promise<Position | null> {
-        const data = await prisma.position.findUnique({
-            where: { id: id },
-        });
-        if (!data) return null;
-        return new Position(data);
-    }
 }
-

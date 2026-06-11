@@ -1,27 +1,8 @@
-const NAME_REGEX = /^[a-zA-ZñÑáéíóúÁÉÍÓÚ ]+$/;
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const PHONE_REGEX = /^(6|7|9)\d{8}$/;
+import { Email } from '../domain/valueObjects/Email';
+import { PersonName } from '../domain/valueObjects/PersonName';
+import { PhoneNumber } from '../domain/valueObjects/PhoneNumber';
+
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-//Length validations according to the database schema
-
-const validateName = (name: string) => {
-    if (!name || name.length < 2 || name.length > 100 || !NAME_REGEX.test(name)) {
-        throw new Error('Invalid name');
-    }
-};
-
-const validateEmail = (email: string) => {
-    if (!email || !EMAIL_REGEX.test(email)) {
-        throw new Error('Invalid email');
-    }
-};
-
-const validatePhone = (phone: string) => {
-    if (phone && !PHONE_REGEX.test(phone)) {
-        throw new Error('Invalid phone');
-    }
-};
 
 const validateDate = (date: string) => {
     if (!date || !DATE_REGEX.test(date)) {
@@ -78,15 +59,9 @@ const validateCV = (cv: any) => {
 };
 
 export const validateCandidateData = (data: any) => {
-    if (data.id) {
-        // If id is provided, we are editing an existing candidate, so fields are not mandatory
-        return;
-    }
-
-    validateName(data.firstName); 
-    validateName(data.lastName); 
-    validateEmail(data.email);
-    validatePhone(data.phone);
+    new PersonName(data.firstName, data.lastName);
+    new Email(data.email);
+    if (data.phone) { new PhoneNumber(data.phone); }
     validateAddress(data.address);
 
     if (data.educations) {
