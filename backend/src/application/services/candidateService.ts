@@ -1,5 +1,8 @@
 import { Candidate } from '../../domain/models/Candidate';
-import { validateCandidateData } from '../validator';
+import { Application } from '../../domain/models/Application';
+import { Position } from '../../domain/models/Position';
+import { InterviewStep } from '../../domain/models/InterviewStep';
+import { validateCandidateData, validateUpdateStageData } from '../validator';
 import { Education } from '../../domain/models/Education';
 import { WorkExperience } from '../../domain/models/WorkExperience';
 import { Resume } from '../../domain/models/Resume';
@@ -62,4 +65,46 @@ export const findCandidateById = async (id: number): Promise<Candidate | null> =
         console.error('Error al buscar el candidato:', error);
         throw new Error('Error al recuperar el candidato');
     }
+};
+
+export const updateCandidateStage = async (candidateId: number, body: any) => {
+    const { positionId, interviewStepId } = validateUpdateStageData(body);
+
+    const candidate = await Candidate.findOne(candidateId);
+    if (!candidate) {
+        throw new Error('Candidate not found');
+    }
+
+    const position = await Position.findOne(positionId);
+    if (!position) {
+        throw new Error('Position not found');
+    }
+
+    const application = await Application.findByCandidateAndPosition(candidateId, positionId);
+    if (!application) {
+        throw new Error('Application not found');
+    }
+
+    const interviewStep = await InterviewStep.findOne(interviewStepId);
+    if (!interviewStep) {
+        throw new Error('Interview step does not belong to the position interview flow');
+    }
+
+    if (interviewStep.interviewFlowId !== position.interviewFlowId) {
+        throw new Error('Interview step does not belong to the position interview flow');
+    }
+
+    application.currentInterviewStep = interviewStepId;
+    const updatedApplication = await application.save();
+
+    return {
+        applicationId: updatedApplication.id,
+        candidateId,
+        positionId,
+        currentInterviewStep: {
+            id: interviewStep.id,
+            name: interviewStep.name,
+            orderIndex: interviewStep.orderIndex,
+        },
+    };
 };
