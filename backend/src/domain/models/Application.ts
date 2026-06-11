@@ -1,7 +1,4 @@
-import { PrismaClient } from '@prisma/client';
 import { Interview } from './Interview';
-
-const prisma = new PrismaClient();
 
 export class Application {
     id?: number;
@@ -10,7 +7,7 @@ export class Application {
     applicationDate: Date;
     currentInterviewStep: number;
     notes?: string;
-    interviews: Interview[]; // Added this line
+    interviews: Interview[];
 
     constructor(data: any) {
         this.id = data.id;
@@ -19,35 +16,6 @@ export class Application {
         this.applicationDate = new Date(data.applicationDate);
         this.currentInterviewStep = data.currentInterviewStep;
         this.notes = data.notes;
-        this.interviews = data.interviews || []; // Added this line
-    }
-
-    async save() {
-        const applicationData: any = {
-            positionId: this.positionId,
-            candidateId: this.candidateId,
-            applicationDate: this.applicationDate,
-            currentInterviewStep: this.currentInterviewStep,
-            notes: this.notes,
-        };
-
-        if (this.id) {
-            return await prisma.application.update({
-                where: { id: this.id },
-                data: applicationData,
-            });
-        } else {
-            return await prisma.application.create({
-                data: applicationData,
-            });
-        }
-    }
-
-    static async findOne(id: number): Promise<Application | null> {
-        const data = await prisma.application.findUnique({
-            where: { id: id },
-        });
-        if (!data) return null;
-        return new Application(data);
+        this.interviews = data.interviews || [];
     }
 }
