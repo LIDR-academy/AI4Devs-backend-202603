@@ -51,6 +51,19 @@ describe('updateCandidateStage', () => {
         });
     });
 
+    it('[mutation M6] busca el interviewStep con interviewStepId, no con applicationId', async () => {
+        // Detecta la mutación: interviewStepFindUnique({ where: { id: applicationId } })
+        // Si se cruzan las variables, applicationId=1 se usaría en vez de interviewStepId=3.
+        __mocks.applicationFindUnique.mockResolvedValue({ id: 1 });
+        __mocks.interviewStepFindUnique.mockResolvedValue({ id: 3 });
+        __mocks.applicationUpdate.mockResolvedValue(updatedApplication);
+
+        await updateCandidateStage(1, 3);
+
+        expect(__mocks.interviewStepFindUnique).toHaveBeenCalledWith({ where: { id: 3 } });
+        expect(__mocks.interviewStepFindUnique).not.toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+
     it('verifica la candidatura antes de buscar el interviewStep', async () => {
         __mocks.applicationFindUnique.mockResolvedValue(null);
 

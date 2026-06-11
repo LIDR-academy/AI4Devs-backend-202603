@@ -57,6 +57,84 @@ describe('addCandidate', () => {
 
         expect(__mocks.candidateCreate).not.toHaveBeenCalled();
     });
+
+    it('[mutation M17+M16] educationCreateMany recibe candidateId del candidato creado y startDate como Date', async () => {
+        // Detecta mutaciones:
+        //   M16 — candidateId: 0 hardcoded en vez de created.id
+        //   M17 — startDate: string en vez de new Date(edu.startDate)
+        const created = { id: 42, firstName: 'Ana', lastName: 'García', email: 'ana@test.com' };
+        __mocks.candidateCreate.mockResolvedValue(created);
+        __mocks.educationCreateMany.mockResolvedValue({ count: 1 });
+
+        await addCandidate({
+            firstName: 'Ana', lastName: 'García', email: 'ana@test.com',
+            educations: [{ institution: 'UCM', title: 'Informática', startDate: '2018-09-01' }],
+        });
+
+        expect(__mocks.educationCreateMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({
+                candidateId: 42,
+                startDate:   expect.any(Date),
+            })],
+        });
+    });
+
+    it('[mutation M17] endDate también se convierte a Date cuando está presente', async () => {
+        const created = { id: 5, firstName: 'Ana', lastName: 'García', email: 'a@b.com' };
+        __mocks.candidateCreate.mockResolvedValue(created);
+        __mocks.educationCreateMany.mockResolvedValue({ count: 1 });
+
+        await addCandidate({
+            firstName: 'Ana', lastName: 'García', email: 'a@b.com',
+            educations: [{
+                institution: 'UCM', title: 'CS',
+                startDate: '2018-09-01', endDate: '2022-06-30',
+            }],
+        });
+
+        expect(__mocks.educationCreateMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({
+                endDate: expect.any(Date),
+            })],
+        });
+    });
+
+    it('[mutation M15] endDate null se preserva como null cuando no está presente', async () => {
+        const created = { id: 6, firstName: 'Ana', lastName: 'García', email: 'c@d.com' };
+        __mocks.candidateCreate.mockResolvedValue(created);
+        __mocks.educationCreateMany.mockResolvedValue({ count: 1 });
+
+        await addCandidate({
+            firstName: 'Ana', lastName: 'García', email: 'c@d.com',
+            educations: [{ institution: 'UCM', title: 'CS', startDate: '2018-09-01' }],
+        });
+
+        expect(__mocks.educationCreateMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({ endDate: null })],
+        });
+    });
+
+    it('[mutation M17] workExperienceCreateMany recibe startDate como Date', async () => {
+        const created = { id: 7, firstName: 'Ana', lastName: 'García', email: 'e@f.com' };
+        __mocks.candidateCreate.mockResolvedValue(created);
+        __mocks.workExperienceCreateMany.mockResolvedValue({ count: 1 });
+
+        await addCandidate({
+            firstName: 'Ana', lastName: 'García', email: 'e@f.com',
+            workExperiences: [{
+                company: 'Acme', position: 'Dev',
+                startDate: '2020-01-01', endDate: '2023-12-31',
+            }],
+        });
+
+        expect(__mocks.workExperienceCreateMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({
+                candidateId: 7,
+                startDate:   expect.any(Date),
+                endDate:     expect.any(Date),
+            })],
+        });
+    });
 });
 
 describe('findCandidateById', () => {

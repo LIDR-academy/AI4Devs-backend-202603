@@ -67,6 +67,19 @@ describe('getCandidatesByPosition', () => {
         ]);
     });
 
+    it('[mutation M8] filtra candidaturas por positionId en la query (no devuelve todas)', async () => {
+        // Detecta la mutación: applicationFindMany sin where: { positionId }
+        // Si se omite el where, se devuelven candidaturas de todas las posiciones.
+        __mocks.positionFindUnique.mockResolvedValue({ id: 7, title: 'Dev' });
+        __mocks.applicationFindMany.mockResolvedValue([]);
+
+        await getCandidatesByPosition(7);
+
+        expect(__mocks.applicationFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { positionId: 7 } })
+        );
+    });
+
     it('construye fullName como "firstName lastName" separados por espacio', async () => {
         __mocks.positionFindUnique.mockResolvedValue({ id: 1 });
         __mocks.applicationFindMany.mockResolvedValue([

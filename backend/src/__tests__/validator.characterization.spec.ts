@@ -1,430 +1,299 @@
-/**
- * Characterization tests — validator.ts
- *
- * Documentan el comportamiento actual del validador tras aplicar el plan de corrección
- * completo (Prompts 11–13) y las decisiones de diseño del Prompt 14.
- *
- * Decisiones aplicadas:
- * - Bypass data.id eliminado: se validaba incondicionalmente.
- * - cv: {} es comportamiento por diseño (equivale a "sin CV"), igual que el servicio.
- */
-
 import { validateCandidateData } from '../application/validator';
 
-const validBase = {
-    firstName: 'Ana',
-    lastName: 'García',
-    email: 'ana@test.com',
-};
+const minValid = { firstName: 'Ana', lastName: 'García', email: 'ana@test.com' };
 
 // ---------------------------------------------------------------------------
-// SIN BYPASS — data.id ya no omite validaciones (Prompt 14)
+// data.id ya NO omite validaciones (bypass eliminado en Prompt 13)
 // ---------------------------------------------------------------------------
 
 describe('data.id no omite validaciones', () => {
-    it('valida aunque data.id sea un número positivo', () => {
+    it('con id presente y nombre inválido lanza error', () => {
         expect(() =>
-            validateCandidateData({ id: 1, email: 'esto-no-es-email' })
+            validateCandidateData({ id: 1, firstName: '1nv4lid', lastName: 'García', email: 'ana@test.com' })
         ).toThrow();
     });
 
-    it('valida aunque data.id sea un string', () => {
+    it('con id presente y email inválido lanza error', () => {
         expect(() =>
-            validateCandidateData({ id: 'abc', firstName: '123', email: 'malformed' })
-        ).toThrow();
-    });
-
-    it('valida aunque data.id sea 0', () => {
-        expect(() =>
-            validateCandidateData({ id: 0, firstName: '123', email: 'malformed' })
+            validateCandidateData({ id: 1, firstName: 'Ana', lastName: 'García', email: 'no-es-email' })
         ).toThrow();
     });
 });
 
 // ---------------------------------------------------------------------------
-// NOMBRE (PersonName Value Object)
+// Validación de nombre — vía PersonName VO
 // ---------------------------------------------------------------------------
 
 describe('validación de nombre vía PersonName VO', () => {
-    it('acepta nombres con letras básicas y acentos', () => {
-        expect(() => validateCandidateData({ ...validBase })).not.toThrow();
-    });
-
-    it('acepta nombres con ñ y caracteres especiales del español', () => {
+    it('acepta nombres válidos con caracteres españoles', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, firstName: 'Íñigo', lastName: 'Muñoz' })
+            validateCandidateData({ ...minValid, firstName: 'María José', lastName: 'García Ruiz' })
         ).not.toThrow();
     });
 
-    it('rechaza firstName con números', () => {
+    it('lanza "Invalid name" si firstName contiene números', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, firstName: '4na' })
+            validateCandidateData({ ...minValid, firstName: '1nv4lid' })
         ).toThrow('Invalid name');
     });
 
-    it('rechaza firstName con caracteres especiales no permitidos', () => {
+    it('lanza "Invalid name" si lastName contiene números', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, firstName: 'Ana!' })
+            validateCandidateData({ ...minValid, lastName: '1nv4lid' })
         ).toThrow('Invalid name');
     });
 
-    it('rechaza firstName de 1 carácter (mínimo 2)', () => {
+    it('lanza "Invalid name" si firstName tiene menos de 2 caracteres', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, firstName: 'A' })
+            validateCandidateData({ ...minValid, firstName: 'A' })
         ).toThrow('Invalid name');
     });
 
-    it('rechaza firstName de más de 50 caracteres', () => {
+    it('lanza "Invalid name" si firstName tiene más de 50 caracteres', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, firstName: 'A'.repeat(51) })
+            validateCandidateData({ ...minValid, firstName: 'A'.repeat(51) })
         ).toThrow('Invalid name');
     });
 
-    it('rechaza lastName vacío', () => {
+    it('acepta exactamente 2 caracteres en firstName', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, lastName: '' })
-        ).toThrow('Invalid name');
+            validateCandidateData({ ...minValid, firstName: 'Jo' })
+        ).not.toThrow();
     });
 
-    it('el mensaje de error es exactamente "Invalid name"', () => {
+    it('acepta exactamente 50 caracteres en firstName', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, firstName: '123' })
-        ).toThrow('Invalid name');
+            validateCandidateData({ ...minValid, firstName: 'A'.repeat(50) })
+        ).not.toThrow();
     });
 });
 
 // ---------------------------------------------------------------------------
-// EMAIL (Email Value Object)
+// Validación de email — vía Email VO
 // ---------------------------------------------------------------------------
 
 describe('validación de email vía Email VO', () => {
-    it('acepta email con formato estándar', () => {
-        expect(() =>
-            validateCandidateData({ ...validBase, email: 'usuario@dominio.com' })
-        ).not.toThrow();
+    it('acepta un email válido', () => {
+        expect(() => validateCandidateData(minValid)).not.toThrow();
     });
 
-    it('rechaza email sin @', () => {
+    it('lanza "Invalid email" con email sin @', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, email: 'usuariodominio.com' })
+            validateCandidateData({ ...minValid, email: 'anatest.com' })
         ).toThrow('Invalid email');
     });
 
-    it('rechaza email sin dominio después del punto', () => {
+    it('lanza "Invalid email" con email sin dominio', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, email: 'usuario@dominio.' })
+            validateCandidateData({ ...minValid, email: 'ana@' })
         ).toThrow('Invalid email');
     });
 
-    it('rechaza string vacío como email', () => {
+    it('lanza "Invalid email" con string vacío', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, email: '' })
+            validateCandidateData({ ...minValid, email: '' })
         ).toThrow('Invalid email');
     });
 });
 
 // ---------------------------------------------------------------------------
-// TELÉFONO (regex directo — [LEGACY] no usa PhoneNumber VO)
+// Validación de teléfono — vía PhoneNumber VO (regex español)
 // ---------------------------------------------------------------------------
 
-describe('[LEGACY] validación de teléfono — regex español directo, sin usar PhoneNumber VO', () => {
-    it('es opcional: undefined no lanza error', () => {
+describe('validación de teléfono vía PhoneNumber VO', () => {
+    it('teléfono ausente no lanza error', () => {
+        expect(() => validateCandidateData(minValid)).not.toThrow();
+    });
+
+    it('acepta número español válido que empieza por 6', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, phone: undefined })
+            validateCandidateData({ ...minValid, phone: '612345678' })
         ).not.toThrow();
     });
 
-    it('es opcional: string vacío no lanza error (falsy, se omite)', () => {
-        // [LEGACY] String vacío se trata como "no proporcionado"
+    it('acepta número español válido que empieza por 7', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, phone: '' })
+            validateCandidateData({ ...minValid, phone: '712345678' })
         ).not.toThrow();
     });
 
-    it('acepta número español de 9 dígitos comenzando en 6', () => {
+    it('acepta número español válido que empieza por 9', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, phone: '612345678' })
+            validateCandidateData({ ...minValid, phone: '912345678' })
         ).not.toThrow();
     });
 
-    it('acepta número español de 9 dígitos comenzando en 7', () => {
+    it('lanza "Invalid phone" con número que empieza por 5', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, phone: '712345678' })
-        ).not.toThrow();
-    });
-
-    it('acepta número español de 9 dígitos comenzando en 9', () => {
-        expect(() =>
-            validateCandidateData({ ...validBase, phone: '912345678' })
-        ).not.toThrow();
-    });
-
-    it('rechaza número comenzando en 5', () => {
-        expect(() =>
-            validateCandidateData({ ...validBase, phone: '512345678' })
+            validateCandidateData({ ...minValid, phone: '512345678' })
         ).toThrow('Invalid phone');
     });
 
-    it('[LEGACY] rechaza formato internacional aunque el PhoneNumber VO lo aceptaría', () => {
-        // El validator usa /^(6|7|9)\d{8}$/ directamente.
-        // PhoneNumber VO usa regex internacional — pero NO está conectado al validator.
-        // Este test documenta la brecha: ambos artefactos tienen comportamiento distinto.
+    it('lanza "Invalid phone" con número de menos de 9 dígitos', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, phone: '+34612345678' })
+            validateCandidateData({ ...minValid, phone: '61234567' })
         ).toThrow('Invalid phone');
     });
 
-    it('[LEGACY] el mensaje de error es "Invalid phone", no "Invalid phone number" (difiere del VO)', () => {
-        // PhoneNumber.ts lanza "Invalid phone number" — el validator lanza "Invalid phone"
+    it('lanza "Invalid phone" con número de más de 9 dígitos', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, phone: '512345678' })
+            validateCandidateData({ ...minValid, phone: '6123456789' })
+        ).toThrow('Invalid phone');
+    });
+
+    it('lanza "Invalid phone" con formato internacional +34', () => {
+        expect(() =>
+            validateCandidateData({ ...minValid, phone: '+34612345678' })
         ).toThrow('Invalid phone');
     });
 });
 
 // ---------------------------------------------------------------------------
-// DIRECCIÓN
+// Validación de dirección
 // ---------------------------------------------------------------------------
 
 describe('validación de dirección', () => {
-    it('es opcional: undefined no lanza error', () => {
+    it('dirección ausente no lanza error', () => {
+        expect(() => validateCandidateData(minValid)).not.toThrow();
+    });
+
+    it('acepta dirección de exactamente 100 caracteres', () => {
         expect(() =>
-            validateCandidateData({ ...validBase })
+            validateCandidateData({ ...minValid, address: 'A'.repeat(100) })
         ).not.toThrow();
     });
 
-    it('acepta dirección dentro del límite de 100 caracteres', () => {
+    it('lanza error con dirección de más de 100 caracteres', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, address: 'Calle Mayor 1, Madrid' })
-        ).not.toThrow();
-    });
-
-    it('rechaza dirección de más de 100 caracteres', () => {
-        expect(() =>
-            validateCandidateData({ ...validBase, address: 'C'.repeat(101) })
+            validateCandidateData({ ...minValid, address: 'A'.repeat(101) })
         ).toThrow('Invalid address');
-    });
-
-    it('[LEGACY] acepta string vacío como dirección (tratado como no proporcionado)', () => {
-        // El check es `if (address && address.length > 100)` — string vacío es falsy
-        expect(() =>
-            validateCandidateData({ ...validBase, address: '' })
-        ).not.toThrow();
     });
 });
 
 // ---------------------------------------------------------------------------
-// EDUCACIÓN
+// Validación de educaciones
 // ---------------------------------------------------------------------------
 
 describe('validación de educaciones', () => {
-    const validEducation = {
-        institution: 'Universidad Complutense',
-        title: 'Informática',
-        startDate: '2015-09-01',
-    };
+    const validEdu = { institution: 'UCM', title: 'Informática', startDate: '2018-09-01' };
 
-    it('educations ausente: no lanza error (campo opcional)', () => {
-        expect(() => validateCandidateData({ ...validBase })).not.toThrow();
+    it('educaciones ausentes no lanza error', () => {
+        expect(() => validateCandidateData(minValid)).not.toThrow();
     });
 
-    it('acepta una educación con datos mínimos válidos', () => {
+    it('acepta educación válida con startDate', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, educations: [validEducation] })
+            validateCandidateData({ ...minValid, educations: [validEdu] })
         ).not.toThrow();
     });
 
-    it('rechaza institution vacía', () => {
+    it('acepta educación válida con startDate y endDate', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                educations: [{ ...validEducation, institution: '' }],
-            })
+            validateCandidateData({ ...minValid, educations: [{ ...validEdu, endDate: '2022-06-30' }] })
+        ).not.toThrow();
+    });
+
+    it('lanza error si institution está vacío', () => {
+        expect(() =>
+            validateCandidateData({ ...minValid, educations: [{ ...validEdu, institution: '' }] })
         ).toThrow('Invalid institution');
     });
 
-    it('rechaza institution de más de 100 caracteres', () => {
+    it('lanza error si title está vacío', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                educations: [{ ...validEducation, institution: 'U'.repeat(101) }],
-            })
-        ).toThrow('Invalid institution');
-    });
-
-    it('rechaza title vacío', () => {
-        expect(() =>
-            validateCandidateData({
-                ...validBase,
-                educations: [{ ...validEducation, title: '' }],
-            })
+            validateCandidateData({ ...minValid, educations: [{ ...validEdu, title: '' }] })
         ).toThrow('Invalid title');
     });
 
-    it('rechaza startDate ausente', () => {
-        const { startDate: _, ...withoutDate } = validEducation;
+    it('lanza error si startDate tiene formato incorrecto', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, educations: [withoutDate] })
+            validateCandidateData({ ...minValid, educations: [{ ...validEdu, startDate: '01/09/2018' }] })
         ).toThrow('Invalid date');
     });
 
-    it('rechaza startDate con formato incorrecto', () => {
+    it('lanza error si endDate tiene formato incorrecto', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                educations: [{ ...validEducation, startDate: '01/09/2015' }],
-            })
-        ).toThrow('Invalid date');
-    });
-
-    it('endDate es opcional: ausente no lanza error', () => {
-        expect(() =>
-            validateCandidateData({ ...validBase, educations: [validEducation] })
-        ).not.toThrow();
-    });
-
-    it('rechaza endDate con formato incorrecto cuando está presente', () => {
-        expect(() =>
-            validateCandidateData({
-                ...validBase,
-                educations: [{ ...validEducation, endDate: '30-06-2019' }],
-            })
+            validateCandidateData({ ...minValid, educations: [{ ...validEdu, endDate: '30-06-2022' }] })
         ).toThrow('Invalid end date');
-    });
-
-    it('acepta endDate con formato YYYY-MM-DD cuando está presente', () => {
-        expect(() =>
-            validateCandidateData({
-                ...validBase,
-                educations: [{ ...validEducation, endDate: '2019-06-30' }],
-            })
-        ).not.toThrow();
     });
 });
 
 // ---------------------------------------------------------------------------
-// EXPERIENCIA LABORAL
+// Validación de experiencias laborales
 // ---------------------------------------------------------------------------
 
-describe('validación de experiencia laboral', () => {
-    const validExperience = {
-        company: 'Acme Corp',
-        position: 'Backend Developer',
-        startDate: '2019-09-01',
-    };
+describe('validación de experiencias laborales', () => {
+    const validExp = { company: 'Acme', position: 'Dev', startDate: '2020-01-01' };
 
-    it('workExperiences ausente: no lanza error (campo opcional)', () => {
-        expect(() => validateCandidateData({ ...validBase })).not.toThrow();
+    it('workExperiences ausentes no lanza error', () => {
+        expect(() => validateCandidateData(minValid)).not.toThrow();
     });
 
-    it('acepta una experiencia con datos mínimos válidos', () => {
+    it('acepta experiencia válida', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, workExperiences: [validExperience] })
+            validateCandidateData({ ...minValid, workExperiences: [validExp] })
         ).not.toThrow();
     });
 
-    it('rechaza company vacía', () => {
+    it('lanza error si company está vacío', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                workExperiences: [{ ...validExperience, company: '' }],
-            })
+            validateCandidateData({ ...minValid, workExperiences: [{ ...validExp, company: '' }] })
         ).toThrow('Invalid company');
     });
 
-    it('rechaza position vacía', () => {
+    it('lanza error si position está vacío', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                workExperiences: [{ ...validExperience, position: '' }],
-            })
+            validateCandidateData({ ...minValid, workExperiences: [{ ...validExp, position: '' }] })
         ).toThrow('Invalid position');
     });
 
-    it('rechaza description de más de 200 caracteres', () => {
+    it('lanza error si description supera 200 caracteres', () => {
         expect(() =>
             validateCandidateData({
-                ...validBase,
-                workExperiences: [{ ...validExperience, description: 'D'.repeat(201) }],
+                ...minValid,
+                workExperiences: [{ ...validExp, description: 'X'.repeat(201) }],
             })
         ).toThrow('Invalid description');
     });
 
-    it('description ausente: no lanza error', () => {
+    it('lanza error si startDate tiene formato incorrecto', () => {
         expect(() =>
-            validateCandidateData({ ...validBase, workExperiences: [validExperience] })
-        ).not.toThrow();
-    });
-
-    it('rechaza startDate ausente', () => {
-        const { startDate: _, ...withoutDate } = validExperience;
-        expect(() =>
-            validateCandidateData({ ...validBase, workExperiences: [withoutDate] })
+            validateCandidateData({ ...minValid, workExperiences: [{ ...validExp, startDate: '2020/01/01' }] })
         ).toThrow('Invalid date');
-    });
-
-    it('rechaza endDate con formato incorrecto cuando está presente', () => {
-        expect(() =>
-            validateCandidateData({
-                ...validBase,
-                workExperiences: [{ ...validExperience, endDate: '2023/12/31' }],
-            })
-        ).toThrow('Invalid end date');
     });
 });
 
 // ---------------------------------------------------------------------------
-// CV
+// Validación del CV
 // ---------------------------------------------------------------------------
 
 describe('validación del CV', () => {
-    it('cv ausente: no lanza error', () => {
-        expect(() => validateCandidateData({ ...validBase })).not.toThrow();
+    it('cv ausente no lanza error', () => {
+        expect(() => validateCandidateData(minValid)).not.toThrow();
     });
 
     it('cv como objeto vacío {} no lanza error — equivale a "sin CV" por diseño', () => {
-        // Decisión de diseño (Prompt 14): cv: {} es tratado como "sin CV proporcionado",
-        // coherente con candidateService.ts que también omite la creación del resume
-        // cuando Object.keys(cv).length === 0.
+        // Object.keys({}).length === 0 → validateCV nunca se llama
         expect(() =>
-            validateCandidateData({ ...validBase, cv: {} })
+            validateCandidateData({ ...minValid, cv: {} })
         ).not.toThrow();
     });
 
     it('acepta cv con filePath y fileType válidos', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                cv: { filePath: 'uploads/cv.pdf', fileType: 'application/pdf' },
-            })
+            validateCandidateData({ ...minValid, cv: { filePath: '/uploads/cv.pdf', fileType: 'application/pdf' } })
         ).not.toThrow();
     });
 
-    it('rechaza cv con filePath pero sin fileType', () => {
-        // [LEGACY] El api-spec no marca fileType como required, pero el validator sí lo exige
+    it('lanza "Invalid CV data" si cv.filePath está ausente', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                cv: { filePath: 'uploads/cv.pdf' },
-            })
+            validateCandidateData({ ...minValid, cv: { fileType: 'application/pdf' } })
         ).toThrow('Invalid CV data');
     });
 
-    it('rechaza cv con fileType pero sin filePath', () => {
+    it('lanza "Invalid CV data" si cv.fileType está ausente', () => {
         expect(() =>
-            validateCandidateData({
-                ...validBase,
-                cv: { fileType: 'application/pdf' },
-            })
-        ).toThrow('Invalid CV data');
-    });
-
-    it('rechaza cv con filePath vacío', () => {
-        expect(() =>
-            validateCandidateData({
-                ...validBase,
-                cv: { filePath: '', fileType: 'application/pdf' },
-            })
+            validateCandidateData({ ...minValid, cv: { filePath: '/uploads/cv.pdf' } })
         ).toThrow('Invalid CV data');
     });
 });

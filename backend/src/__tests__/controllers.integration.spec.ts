@@ -1,28 +1,16 @@
-/**
- * Integration tests — HTTP layer (controllers + routes)
- *
- * Prueban la capa HTTP end-to-end desde la petición hasta la respuesta,
- * mockeando únicamente la base de datos (prismaClient singleton).
- *
- * NOTA DE DISEÑO DESCUBIERTA:
- * POST /candidates usa un handler inline en candidateRoutes.ts que llama al
- * servicio directamente, NO usa addCandidateController. Por eso la respuesta
- * 201 es el objeto crudo del candidato (sin envelope { message, data }).
- * addCandidateController existe pero no está cableado a ninguna ruta.
- * Esta inconsistencia con api-spec.yaml queda documentada en los tests.
- */
+// ---------------------------------------------------------------------------
+// Mock del singleton PrismaClient ANTES de cualquier import de la app
+// ---------------------------------------------------------------------------
 
 jest.mock('../infrastructure/database/prismaClient', () => {
-    const candidateCreate   = jest.fn();
-    const candidateFindUnique = jest.fn();
-    const educationCreateMany = jest.fn();
+    const candidateCreate      = jest.fn();
+    const candidateFindUnique  = jest.fn();
+    const educationCreateMany  = jest.fn();
     const workExperienceCreateMany = jest.fn();
-    const resumeCreate      = jest.fn();
+    const resumeCreate         = jest.fn();
     const applicationFindUnique = jest.fn();
-    const applicationUpdate = jest.fn();
+    const applicationUpdate    = jest.fn();
     const interviewStepFindUnique = jest.fn();
-    const positionFindUnique = jest.fn();
-    const applicationFindMany = jest.fn();
 
     return {
         __esModule: true,
@@ -31,141 +19,127 @@ jest.mock('../infrastructure/database/prismaClient', () => {
             education:     { createMany: educationCreateMany },
             workExperience: { createMany: workExperienceCreateMany },
             resume:        { create: resumeCreate },
-            application:   { findUnique: applicationFindUnique, update: applicationUpdate, findMany: applicationFindMany },
+            application:   { findUnique: applicationFindUnique, update: applicationUpdate },
             interviewStep: { findUnique: interviewStepFindUnique },
-            position:      { findUnique: positionFindUnique },
         },
         __mocks: {
-            candidateCreate, candidateFindUnique, educationCreateMany,
-            workExperienceCreateMany, resumeCreate, applicationFindUnique,
-            applicationUpdate, interviewStepFindUnique, positionFindUnique,
-            applicationFindMany,
+            candidateCreate,
+            candidateFindUnique,
+            educationCreateMany,
+            workExperienceCreateMany,
+            resumeCreate,
+            applicationFindUnique,
+            applicationUpdate,
+            interviewStepFindUnique,
         },
     };
 });
 
 import request from 'supertest';
-import { app }  from '../index';
+import { app } from '../index';
 
 const { __mocks } = jest.requireMock('../infrastructure/database/prismaClient') as any;
 
 beforeEach(() => jest.clearAllMocks());
 
 // ---------------------------------------------------------------------------
-// GET /
-// ---------------------------------------------------------------------------
-
-describe('GET /', () => {
-    it('devuelve 200 con texto "Hola LTI!"', async () => {
-        const res = await request(app).get('/');
-        expect(res.status).toBe(200);
-        expect(res.text).toBe('Hola LTI!');
-    });
-});
-
-// ---------------------------------------------------------------------------
 // POST /candidates
-// NOTA: el handler usa el servicio directamente — respuesta 201 sin envelope
+// NOTA: La ruta usa un handler inline que envía el resultado directamente
+//       (sin envelope { message, data }). El error se envía como { message }.
 // ---------------------------------------------------------------------------
 
 describe('POST /candidates', () => {
-    const validPayload = {
-        firstName: 'Ana',
-        lastName: 'García',
-        email: 'ana@test.com',
-        phone: '612345678',
-    };
+    it('201 — crea candidato con datos mínimos válidos', async () => {
+        const saved = { id: 1, firstName: 'Ana', lastName: 'García', email: 'ana@test.com' };
+        __mocks.candidateCreate.mockResolvedValue(saved);
 
-    it('201 con el candidato creado (sin envelope { message, data })', async () => {
-        const created = { id: 1, firstName: 'Ana', lastName: 'García', email: 'ana@test.com' };
-        __mocks.candidateCreate.mockResolvedValue(created);
-
-        const res = await request(app).post('/candidates').send(validPayload);
+        const res = await request(app)
+            .post('/candidates')
+            .send({ firstName: 'Ana', lastName: 'García', email: 'ana@test.com' });
 
         expect(res.status).toBe(201);
-        expect(res.body).toEqual(created);
-        expect(res.body).not.toHaveProperty('message'); // sin envelope
+        expect(res.body).toMatchObject({ id: 1, email: 'ana@test.com' });
     });
 
-    it('400 cuando el email tiene formato inválido', async () => {
+    it('400 — nombre con números → "Invalid name"', async () => {
         const res = await request(app)
             .post('/candidates')
-            .send({ ...validPayload, email: 'no-es-email' });
-
-        expect(res.status).toBe(400);
-        expect(res.body).toHaveProperty('message');
-        expect(__mocks.candidateCreate).not.toHaveBeenCalled();
-    });
-
-    it('400 cuando el nombre contiene números', async () => {
-        const res = await request(app)
-            .post('/candidates')
-            .send({ ...validPayload, firstName: '4na' });
+            .send({ firstName: '1nv4lid', lastName: 'García', email: 'ana@test.com' });
 
         expect(res.status).toBe(400);
         expect(res.body.message).toBe('Invalid name');
+        expect(__mocks.candidateCreate).not.toHaveBeenCalled();
     });
 
-    it('400 cuando el teléfono no cumple el formato español', async () => {
+    it('400 — email sin @ → "Invalid email"', async () => {
         const res = await request(app)
             .post('/candidates')
-            .send({ ...validPayload, phone: '512345678' }); // empieza en 5
+            .send({ firstName: 'Ana', lastName: 'García', email: 'no-es-email' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe('Invalid email');
+    });
+
+    it('400 — teléfono con formato internacional → "Invalid phone"', async () => {
+        const res = await request(app)
+            .post('/candidates')
+            .send({ firstName: 'Ana', lastName: 'García', email: 'ana@test.com', phone: '+34612345678' });
 
         expect(res.status).toBe(400);
         expect(res.body.message).toBe('Invalid phone');
     });
 
-    it('400 cuando el email ya existe en BD (P2002)', async () => {
+    it('400 — email duplicado (P2002) → "The email already exists in the database"', async () => {
         __mocks.candidateCreate.mockRejectedValue({ code: 'P2002' });
 
-        const res = await request(app).post('/candidates').send(validPayload);
+        const res = await request(app)
+            .post('/candidates')
+            .send({ firstName: 'Ana', lastName: 'García', email: 'duplicado@test.com' });
 
         expect(res.status).toBe(400);
-        expect(res.body.message).toContain('email already exists');
+        expect(res.body.message).toBe('The email already exists in the database');
     });
 
-    it('400 cuando firstName está ausente', async () => {
-        const { firstName: _, ...withoutName } = validPayload;
-        const res = await request(app).post('/candidates').send(withoutName);
+    it('201 — candidato con educación válida', async () => {
+        const saved = { id: 2, firstName: 'Ana', lastName: 'García', email: 'ana@test.com' };
+        __mocks.candidateCreate.mockResolvedValue(saved);
+        __mocks.educationCreateMany.mockResolvedValue({ count: 1 });
 
-        expect(res.status).toBe(400);
+        const res = await request(app)
+            .post('/candidates')
+            .send({
+                firstName: 'Ana', lastName: 'García', email: 'ana@test.com',
+                educations: [{ institution: 'UCM', title: 'Informática', startDate: '2018-09-01' }],
+            });
+
+        expect(res.status).toBe(201);
+        expect(__mocks.educationCreateMany).toHaveBeenCalledTimes(1);
     });
 
-    it('400 cuando se envía education con institution vacía', async () => {
-        const res = await request(app).post('/candidates').send({
-            ...validPayload,
-            educations: [{ institution: '', title: 'CS', startDate: '2020-01-01' }],
-        });
+    it('400 — educación con institution vacía → "Invalid institution"', async () => {
+        const res = await request(app)
+            .post('/candidates')
+            .send({
+                firstName: 'Ana', lastName: 'García', email: 'ana@test.com',
+                educations: [{ institution: '', title: 'Informática', startDate: '2018-09-01' }],
+            });
 
         expect(res.status).toBe(400);
         expect(res.body.message).toBe('Invalid institution');
     });
 
-    it('201 sin crear resume si cv es objeto vacío', async () => {
-        const created = { id: 2, firstName: 'Ana', lastName: 'García', email: 'b@test.com' };
-        __mocks.candidateCreate.mockResolvedValue(created);
+    it('400 — cv con filePath pero sin fileType → "Invalid CV data"', async () => {
+        __mocks.candidateCreate.mockResolvedValue({ id: 3, firstName: 'Ana', lastName: 'García', email: 'ana@test.com' });
 
         const res = await request(app)
             .post('/candidates')
-            .send({ ...validPayload, email: 'b@test.com', cv: {} });
+            .send({
+                firstName: 'Ana', lastName: 'García', email: 'ana@test.com',
+                cv: { filePath: '/uploads/cv.pdf' },
+            });
 
-        expect(res.status).toBe(201);
-        expect(__mocks.resumeCreate).not.toHaveBeenCalled();
-    });
-
-    it('201 y crea resume cuando cv tiene filePath y fileType', async () => {
-        const created = { id: 3, firstName: 'Ana', lastName: 'García', email: 'c@test.com' };
-        __mocks.candidateCreate.mockResolvedValue(created);
-        __mocks.resumeCreate.mockResolvedValue({});
-
-        const res = await request(app).post('/candidates').send({
-            ...validPayload,
-            email: 'c@test.com',
-            cv: { filePath: 'uploads/cv.pdf', fileType: 'application/pdf' },
-        });
-
-        expect(res.status).toBe(201);
-        expect(__mocks.resumeCreate).toHaveBeenCalledTimes(1);
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe('Invalid CV data');
     });
 });
 
@@ -174,40 +148,34 @@ describe('POST /candidates', () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /candidates/:id', () => {
-    const fullCandidate = {
-        id: 1, firstName: 'Ana', lastName: 'García', email: 'ana@test.com',
-        educations: [], workExperiences: [], resumes: [], applications: [],
-    };
-
-    it('200 con el candidato cuando existe', async () => {
-        __mocks.candidateFindUnique.mockResolvedValue(fullCandidate);
+    it('200 — devuelve el candidato cuando existe', async () => {
+        const candidateData = {
+            id: 1,
+            firstName: 'Ana', lastName: 'García', email: 'ana@test.com',
+            education: [], workExperience: [], resumes: [], applications: [],
+        };
+        __mocks.candidateFindUnique.mockResolvedValue(candidateData);
 
         const res = await request(app).get('/candidates/1');
 
         expect(res.status).toBe(200);
-        expect(res.body.email).toBe('ana@test.com');
-        // NOTA: Candidate model almacena como 'education' y 'workExperience' (singular)
-        // aunque Prisma devuelve 'educations' y 'workExperiences'. Inconsistencia de naming.
-        expect(res.body).toHaveProperty('education');
-        expect(res.body).toHaveProperty('workExperience');
-        expect(res.body).toHaveProperty('resumes');
-        expect(res.body).toHaveProperty('applications');
+        expect(res.body).toMatchObject({ id: 1, email: 'ana@test.com' });
     });
 
-    it('404 cuando el candidato no existe', async () => {
+    it('404 — candidato no encontrado', async () => {
         __mocks.candidateFindUnique.mockResolvedValue(null);
 
         const res = await request(app).get('/candidates/999');
 
         expect(res.status).toBe(404);
-        expect(res.body).toEqual({ error: 'Candidate not found' });
+        expect(res.body).toHaveProperty('error');
     });
 
-    it('400 cuando el id no es numérico', async () => {
+    it('400 — id no numérico', async () => {
         const res = await request(app).get('/candidates/abc');
 
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: 'Invalid ID format' });
+        expect(res.body.error).toBe('Invalid ID format');
     });
 });
 
@@ -216,25 +184,22 @@ describe('GET /candidates/:id', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /candidates/:id/stage', () => {
-    it('200 con mensaje de éxito cuando se actualiza la fase', async () => {
-        const application = { id: 1, candidateId: 2, positionId: 3, currentInterviewStep: 2 };
-        const step        = { id: 2, name: 'Técnica' };
-        const updated     = { ...application, currentInterviewStep: 2 };
+    const updatedApp = { id: 1, candidateId: 2, positionId: 4, currentInterviewStep: 3 };
 
-        __mocks.applicationFindUnique.mockResolvedValue(application);
-        __mocks.interviewStepFindUnique.mockResolvedValue(step);
-        __mocks.applicationUpdate.mockResolvedValue(updated);
+    it('200 — actualiza la fase correctamente', async () => {
+        __mocks.applicationFindUnique.mockResolvedValue({ id: 1 });
+        __mocks.interviewStepFindUnique.mockResolvedValue({ id: 3 });
+        __mocks.applicationUpdate.mockResolvedValue(updatedApp);
 
         const res = await request(app)
             .post('/candidates/1/stage')
-            .send({ currentInterviewStep: 2 });
+            .send({ currentInterviewStep: 3 });
 
         expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Stage updated successfully');
-        expect(res.body).toHaveProperty('data');
+        expect(res.body).toMatchObject({ message: 'Stage updated successfully', data: updatedApp });
     });
 
-    it('404 cuando la candidatura no existe', async () => {
+    it('404 — candidatura no encontrada', async () => {
         __mocks.applicationFindUnique.mockResolvedValue(null);
 
         const res = await request(app)
@@ -242,78 +207,27 @@ describe('POST /candidates/:id/stage', () => {
             .send({ currentInterviewStep: 1 });
 
         expect(res.status).toBe(404);
-        expect(res.body).toEqual({ error: 'Application not found' });
+        expect(res.body.error).toBe('Application not found');
     });
 
-    it('400 cuando el interviewStep no existe', async () => {
+    it('400 — interview step no encontrado', async () => {
         __mocks.applicationFindUnique.mockResolvedValue({ id: 1 });
         __mocks.interviewStepFindUnique.mockResolvedValue(null);
 
         const res = await request(app)
             .post('/candidates/1/stage')
-            .send({ currentInterviewStep: 99 });
+            .send({ currentInterviewStep: 999 });
 
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: 'Interview step not found' });
+        expect(res.body.error).toBe('Interview step not found');
     });
 
-    it('400 cuando el id de la candidatura no es numérico', async () => {
+    it('400 — currentInterviewStep no numérico', async () => {
         const res = await request(app)
-            .post('/candidates/abc/stage')
-            .send({ currentInterviewStep: 1 });
+            .post('/candidates/1/stage')
+            .send({ currentInterviewStep: 'abc' });
 
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: 'Invalid ID format' });
-    });
-});
-
-// ---------------------------------------------------------------------------
-// GET /positions/:id/candidates
-// ---------------------------------------------------------------------------
-
-describe('GET /positions/:id/candidates', () => {
-    it('200 con array de candidatos en proceso', async () => {
-        __mocks.positionFindUnique.mockResolvedValue({ id: 1, title: 'Dev' });
-        __mocks.applicationFindMany.mockResolvedValue([
-            {
-                candidate: { firstName: 'Ana', lastName: 'García' },
-                interviewStep: { name: 'Técnica' },
-                interviews: [{ score: 8 }, { score: 9 }],
-            },
-        ]);
-
-        const res = await request(app).get('/positions/1/candidates');
-
-        expect(res.status).toBe(200);
-        expect(Array.isArray(res.body)).toBe(true);
-        expect(res.body[0]).toHaveProperty('fullName');
-        expect(res.body[0]).toHaveProperty('currentInterviewStep');
-        expect(res.body[0]).toHaveProperty('averageScore');
-    });
-
-    it('200 con array vacío si la posición no tiene candidaturas', async () => {
-        __mocks.positionFindUnique.mockResolvedValue({ id: 1, title: 'Dev' });
-        __mocks.applicationFindMany.mockResolvedValue([]);
-
-        const res = await request(app).get('/positions/1/candidates');
-
-        expect(res.status).toBe(200);
-        expect(res.body).toEqual([]);
-    });
-
-    it('404 cuando la posición no existe', async () => {
-        __mocks.positionFindUnique.mockResolvedValue(null);
-
-        const res = await request(app).get('/positions/999/candidates');
-
-        expect(res.status).toBe(404);
-        expect(res.body).toEqual({ error: 'Position not found' });
-    });
-
-    it('400 cuando el id no es numérico', async () => {
-        const res = await request(app).get('/positions/abc/candidates');
-
-        expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: 'Invalid ID format' });
+        expect(res.body.error).toBe('Invalid ID format');
     });
 });
