@@ -3,8 +3,13 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 import candidateRoutes from './routes/candidateRoutes';
+import positionRoutes from './routes/positionRoutes';
 import { uploadFile } from './application/services/fileUploadService';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import { parse } from 'yaml';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Extender la interfaz Request para incluir prisma
 declare global {
@@ -36,8 +41,13 @@ app.use(cors({
   credentials: true
 }));
 
+// Swagger UI
+const swaggerDocument = parse(readFileSync(join(__dirname, '../api-spec.yaml'), 'utf8'));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // Import and use candidateRoutes
 app.use('/candidates', candidateRoutes);
+app.use('/positions', positionRoutes);
 
 // Route for file uploads
 app.post('/upload', uploadFile);
