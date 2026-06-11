@@ -77,6 +77,26 @@ const validateCV = (cv: any) => {
     }
 };
 
+const validatePositiveInteger = (value: any, fieldName: string): number => {
+    if (value === undefined || value === null) {
+        throw new Error(`Invalid ${fieldName}`);
+    }
+    const num = Number(value);
+    if (!Number.isInteger(num) || num <= 0) {
+        throw new Error(`Invalid ${fieldName}`);
+    }
+    return num;
+};
+
+export const validateUpdateStageData = (data: any) => {
+    if (!data || typeof data !== 'object') {
+        throw new Error('Invalid request body');
+    }
+    const positionId = validatePositiveInteger(data.positionId, 'positionId');
+    const interviewStepId = validatePositiveInteger(data.interviewStepId, 'interviewStepId');
+    return { positionId, interviewStepId };
+};
+
 export const validateCandidateData = (data: any) => {
     if (data.id) {
         // If id is provided, we are editing an existing candidate, so fields are not mandatory

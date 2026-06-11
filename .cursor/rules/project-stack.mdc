@@ -1,0 +1,107 @@
+---
+description: Stack, arquitectura y convenciones del proyecto AI4Devs-db (LTI reclutamiento)
+alwaysApply: true
+---
+
+# AI4Devs-db — Contexto del proyecto
+
+## Dominio
+
+Sistema de reclutamiento (LTI): registro de candidatos con formación, experiencia laboral y CV; panel de reclutador para alta de candidatos. La API actual cubre candidatos y subida de ficheros. El ERM objetivo (`docs/erm-new-entities.mmd`) extiende el dominio con empresas, empleados, vacantes, flujos de entrevista, candidaturas e entrevistas.
+
+## Stack
+
+| Capa | Tecnología |
+|------|------------|
+| Frontend | React 18, Create React App, TypeScript 4.9, React Bootstrap 2, react-router-dom 6 |
+| Backend | Node.js, Express 4, TypeScript 4.9, ts-node-dev |
+| ORM / BD | Prisma 5.13, PostgreSQL (docker-compose en raíz) |
+| API docs | OpenAPI 3 (`backend/api-spec.yaml`), Swagger (swagger-jsdoc, swagger-ui-express) |
+| Tests backend | Jest, ts-jest |
+| Upload | multer (PDF y DOCX según spec) |
+
+Puertos habituales: frontend `3000`, backend `3010`, PostgreSQL vía `DB_PORT` en `.env`.
+
+## Estructura de carpetas
+
+```
+frontend/src/          # UI (components/, services/)
+backend/src/
+  presentation/        # controllers
+  application/         # services, validator
+  domain/models/       # clases de dominio con persistencia Prisma
+  routes/
+backend/prisma/        # schema.prisma, migrations/
+docs/                  # erm-new-entities.mmd, schema-normalization.md
+prompts/               # prompts del ejercicio
+```
+
+## Arquitectura backend
+
+Capas en uso:
+
+1. **presentation** — `candidateController.ts`: HTTP, respuestas y códigos de estado.
+2. **application** — `candidateService.ts`, `fileUploadService.ts`, `validator.ts`: orquestación y validación (reglas alineadas con `api-spec.yaml`).
+3. **domain** — Modelos activos (`Candidate`, `Education`, `WorkExperience`, `Resume`) con métodos `save()` / `findOne()` que llaman a `@prisma/client` directamente.
+
+`PrismaClient` se instancia en `index.ts` y se inyecta en `req.prisma` por middleware. CORS permitido desde `http://localhost:3000`.
+
+Convenciones Prisma actuales:
+
+- Modelos en **PascalCase** (`Candidate`, `WorkExperience`).
+- Campos en **camelCase** (`firstName`, `candidateId`).
+- IDs `Int` con `@id @default(autoincrement())`.
+- Longitudes vía `@db.VarChar(n)` cuando aplica.
+- Relaciones hijas con FK explícita (`candidateId`) y `onDelete` por defecto RESTRICT en migraciones.
+
+## Modelo de datos (3NF, migrado)
+
+**12 modelos en BD:** `Candidate`, `Education`, `WorkExperience`, `Resume`, `Company`, `Employee`, `Position`, `InterviewFlow`, `InterviewStep`, `InterviewType`, `Application`, `Interview`.
+
+**Migraciones:** `20260601231759_inicial`, `20260602002709_add_recruitment_entities_3nf`. Detalle en `docs/schema-normalization.md` y `docs/erm-new-entities.mmd`.
+
+**Reglas 3NF:** no duplicar datos de `Company` en `Position`; `WorkExperience.company` ≠ entidad `Company`.
+
+## API y validación
+
+- Contrato: `backend/api-spec.yaml` (título: AI4Devs Candidate API).
+- Endpoints actuales: `POST /candidates`, `POST /upload`; rutas montadas en `/candidates` desde `candidateRoutes.ts`.
+- Validación en `application/validator.ts` (nombres, email, teléfono español, fechas `YYYY-MM-DD`, longitudes según schema).
+- Errores Prisma: p. ej. `P2002` (email duplicado) manejado en servicio.
+
+## Reglas para cambios de base de datos
+
+1. Usar `docs/erm-new-entities.mmd` como fuente de verdad para entidades, atributos y cardinalidades.
+2. Actualizar `backend/prisma/schema.prisma` y generar migración con `npx prisma migrate dev` desde `backend/`.
+3. Ejecutar `npm run prisma:generate` (o `npx prisma generate`) tras cambios de schema.
+4. Mantener compatibilidad con modelos y migración existentes; no eliminar ni renombrar campos de `Candidate` sin migración explícita.
+5. Extender `api-spec.yaml` y capas domain/application/presentation cuando se expongan nuevos recursos.
+6. Replicar patrones existentes: clases en `domain/models/`, validación en `application/validator.ts`, servicios en `application/services/`.
+7. Mapear tipos ERM → Prisma: `string` → `String`, `text` → `String` sin límite o `@db.Text`, `numeric` → `Decimal`, `date` → `DateTime` @db.Date o `DateTime`, `boolean` → `Boolean`.
+8. Nombres de tablas/modelos: preferir PascalCase singular en Prisma (como el código actual).
+
+## Comandos útiles
+
+```bash
+# Base de datos (raíz del repo)
+docker compose up -d
+
+# Backend (carpeta backend/)
+npm run dev              # ts-node-dev, puerto 3010
+npm run build && npm start
+npm run prisma:generate
+npx prisma migrate dev
+npm test
+
+# Frontend (carpeta frontend/)
+npm start                # puerto 3000
+npm run build
+```
+
+Variables: `DATABASE_URL`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT` en `.env` (raíz, `backend/` o `frontend/`).
+
+## Notas
+
+- No hay README raíz del producto; `frontend/README.md` es el de Create React App.
+- El frontend mezcla `.js` y `.tsx`; componentes de reclutamiento en `RecruiterDashboard.js`, `AddCandidateForm.js`.
+- Swagger está en dependencias; la spec principal es el YAML estático.

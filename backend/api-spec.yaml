@@ -152,6 +152,110 @@ paths:
           description: Bad request (invalid input data)
         '500':
           description: Internal server error
+  /candidates/{id}/stage:
+    put:
+      summary: Update candidate interview stage
+      description: Updates the current interview step for a candidate application to a specific position.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Candidate ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - positionId
+                - interviewStepId
+              properties:
+                positionId:
+                  type: integer
+                  description: Position ID identifying the application
+                interviewStepId:
+                  type: integer
+                  description: New current interview step ID
+      responses:
+        '200':
+          description: Stage updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applicationId:
+                    type: integer
+                  candidateId:
+                    type: integer
+                  positionId:
+                    type: integer
+                  currentInterviewStep:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      orderIndex:
+                        type: integer
+        '400':
+          description: Invalid input or interview step does not belong to position flow
+        '404':
+          description: Candidate, position or application not found
+        '500':
+          description: Internal server error
+  /positions/{id}/candidates:
+    get:
+      summary: Get candidates in process for a position
+      description: Returns candidates with an active application for the given position, including current interview step and average score.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Position ID
+      responses:
+        '200':
+          description: List of candidates in process
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  positionId:
+                    type: integer
+                  candidates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        candidateId:
+                          type: integer
+                        fullName:
+                          type: string
+                        currentInterviewStep:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            orderIndex:
+                              type: integer
+                        averageScore:
+                          type: number
+                          nullable: true
+        '400':
+          description: Invalid position ID format
+        '404':
+          description: Position not found
+        '500':
+          description: Internal server error
   /upload:
     post:
       summary: Upload a file
