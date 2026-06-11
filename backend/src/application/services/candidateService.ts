@@ -1,63 +1,95 @@
-import { Candidate } from '../../domain/models/Candidate';
 import { validateCandidateData } from '../validator';
-import { Education } from '../../domain/models/Education';
-import { WorkExperience } from '../../domain/models/WorkExperience';
-import { Resume } from '../../domain/models/Resume';
+import prisma from '../../infrastructure/database/prismaClient';
+import { Candidate } from '../../domain/models/Candidate';
 
 export const addCandidate = async (candidateData: any) => {
     try {
-        validateCandidateData(candidateData); // Validar los datos del candidato
+        validateCandidateData(candidateData);
     } catch (error: any) {
-        throw new Error(error);
+        throw error;
     }
 
-    const candidate = new Candidate(candidateData); // Crear una instancia del modelo Candidate
     try {
-        const savedCandidate = await candidate.save(); // Guardar el candidato en la base de datos
-        const candidateId = savedCandidate.id; // Obtener el ID del candidato guardado
+        const created = await prisma.candidate.create({
+            data: {
+                firstName: candidateData.firstName,
+                lastName: candidateData.lastName,
+                email: candidateData.email,
+                phone: candidateData.phone,
+                address: candidateData.address,
+            },
+        });
 
-        // Guardar la educación del candidato
-        if (candidateData.educations) {
-            for (const education of candidateData.educations) {
-                const educationModel = new Education(education);
-                educationModel.candidateId = candidateId;
-                await educationModel.save();
-                candidate.education.push(educationModel);
-            }
+        if (candidateData.educations?.length) {
+            await prisma.education.createMany({
+                data: candidateData.educations.map((edu: any) => ({
+                    candidateId: created.id,
+                    institution: edu.institution,
+                    title: edu.title,
+                    startDate: new Date(edu.startDate),
+                    endDate: edu.endDate ? new Date(edu.endDate) : null,
+                })),
+            });
         }
 
-        // Guardar la experiencia laboral del candidato
-        if (candidateData.workExperiences) {
-            for (const experience of candidateData.workExperiences) {
-                const experienceModel = new WorkExperience(experience);
-                experienceModel.candidateId = candidateId;
-                await experienceModel.save();
-                candidate.workExperience.push(experienceModel);
-            }
+        if (candidateData.workExperiences?.length) {
+            await prisma.workExperience.createMany({
+                data: candidateData.workExperiences.map((exp: any) => ({
+                    candidateId: created.id,
+                    company: exp.company,
+                    position: exp.position,
+                    description: exp.description,
+                    startDate: new Date(exp.startDate),
+                    endDate: exp.endDate ? new Date(exp.endDate) : null,
+                })),
+            });
         }
 
-        // Guardar los archivos de CV
         if (candidateData.cv && Object.keys(candidateData.cv).length > 0) {
-            const resumeModel = new Resume(candidateData.cv);
-            resumeModel.candidateId = candidateId;
-            await resumeModel.save();
-            candidate.resumes.push(resumeModel);
+            await prisma.resume.create({
+                data: {
+                    candidateId: created.id,
+                    filePath: candidateData.cv.filePath,
+                    fileType: candidateData.cv.fileType,
+                    uploadDate: new Date(),
+                },
+            });
         }
-        return savedCandidate;
+
+        return created;
     } catch (error: any) {
         if (error.code === 'P2002') {
-            // Unique constraint failed on the fields: (`email`)
             throw new Error('The email already exists in the database');
-        } else {
-            throw error;
         }
+        throw error;
     }
 };
 
 export const findCandidateById = async (id: number): Promise<Candidate | null> => {
     try {
-        const candidate = await Candidate.findOne(id); // Cambio aquí: pasar directamente el id
-        return candidate;
+        const data = await prisma.candidate.findUnique({
+            where: { id },
+            include: {
+                educations: true,
+                workExperiences: true,
+                resumes: true,
+                applications: {
+                    include: {
+                        position: { select: { id: true, title: true } },
+                        interviews: {
+                            select: {
+                                interviewDate: true,
+                                interviewStep: { select: { name: true } },
+                                notes: true,
+                                score: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!data) return null;
+        return new Candidate(data);
     } catch (error) {
         console.error('Error al buscar el candidato:', error);
         throw new Error('Error al recuperar el candidato');
