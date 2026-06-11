@@ -1,131 +1,115 @@
 # LTI - Talent Tracking System | EN
 
-This project is a full-stack application with a React frontend and an Express backend using Prisma as an ORM. The frontend is started with Create React App, and the backend is written in TypeScript.
+LTI (Lean Talent Intelligence) is a full-stack ATS (Applicant Tracking System) with a React frontend and an Express + TypeScript backend using Prisma ORM and PostgreSQL.
 
-## Explanation of Directories and Files
+The backend follows **Hexagonal Architecture (Ports & Adapters)** with DDD tactical patterns. Domain models are pure data classes with no infrastructure dependencies.
 
-- `backend/`: Contains the server-side code written in Node.js.
-  - `src/`: Contains the source code for the backend.
-    - `index.ts`: The entry point for the backend server.
-    - `application/`: Contains the application logic.
-    - `domain/`: Contains the business logic.
-    - `infrastructure/`: Contains code that communicates with the database.
-    - `presentation/`: Contains code related to the presentation layer (such as controllers).
-    - `routes/`: Contains the route definitions for the API.
-    - `tests/`: Contains test files.
-  - `prisma/`: Contains the Prisma schema file for ORM.
-  - `tsconfig.json`: TypeScript configuration file.
-- `frontend/`: Contains the client-side code written in React."
-  - `src/`: Contains the source code for the frontend.
-  - `public/`: Contains static files such as the HTML file and images.
-  - `build/`: Contains the production-ready build of the frontend.
-- `.env`: Contains the environment variables.
-- `docker-compose.yml`: Contains the Docker Compose configuration to manage your application's services.
-- `README.md`: This file contains information about the project and instructions on how to run it.
+## Backend Architecture
+
+```
+src/
+├── application/
+│   ├── services/           # Business logic — orchestrates queries, no req/res
+│   └── validator.ts        # Input validation (delegates to Value Objects)
+├── domain/
+│   ├── models/             # Pure entities: properties + constructor only
+│   ├── repositories/       # Interfaces (Ports): ICandidateRepository, etc.
+│   └── valueObjects/       # Email, PhoneNumber, PersonName — self-validating
+├── infrastructure/
+│   ├── database/           # Singleton PrismaClient (shared across the app)
+│   └── repositories/       # Adapters: PrismaCandidateRepository, etc.
+├── presentation/
+│   └── controllers/        # HTTP layer: parse request, map errors to status codes
+├── routes/                 # Express route definitions
+└── index.ts                # Entry point: Express setup and middleware
+```
 
 ## Project Structure
 
-The project is divided into two main directories: `frontend` and `backend`.
-
-### Frontend
-
-The frontend is a React application, and its main files are located in the src directory. The public directory contains static assets, and the build directory contains the production build of the application.
-
-### Backend
-
-The backend is an Express application written in TypeScript. The src directory contains the source code, divided into several subdirectories:
-
-- `application`: Contains the application logic.
-- `domain`: Contains the domain models.
-- `infrastructure`: Contains code related to the infrastructure.
-- `presentation`: Contains code related to the presentation layer.
-- `routes`: Contains the application routes.
-- `tests`: Contains the application tests.
-
-The `prisma` directory contains the Prisma schema.
+```
+AI4Devs-backend-202603/
+├── backend/
+│   ├── prisma/schema.prisma     # Data model (12 entities)
+│   ├── src/                     # Source code (see architecture above)
+│   ├── api-spec.yaml            # OpenAPI 3.0 specification
+│   ├── package.json
+│   └── tsconfig.json
+├── frontend/
+│   ├── public/                  # Static assets
+│   └── src/
+│       ├── components/          # AddCandidateForm, FileUploader, RecruiterDashboard
+│       ├── services/            # HTTP clients for the API
+│       └── App.tsx
+├── docker-compose.yml           # PostgreSQL container
+└── .env                         # Environment variables (do not commit)
+```
 
 ## First steps
 
-To get started with this project, follow these steps:
-
 1. Clone the repository.
-2. Install the dependencies for the frontend and backend:
+2. Install dependencies:
 
 ```sh
-cd frontend
-npm install
-
-cd ../backend
-npm install
-```
-3. Build the backend server:
-```
-cd backend
-npm run build
-````
-4. Start the backend server:
-```
-cd backend
-npm start
-```
-5. In a new terminal window, build the frontend server:
-```
-cd frontend
-npm run build
-```
-6. Start the frontend server:
-```
-cd frontend
-npm start
+cd frontend && npm install
+cd ../backend && npm install
 ```
 
-The backend server will be running at http://localhost:3010 and the frontend will be available at http://localhost:3000.
+3. Start the database:
+
+```sh
+docker-compose up -d
+```
+
+4. Set up Prisma:
+
+```sh
+cd backend
+npx prisma generate
+npx prisma migrate dev
+ts-node prisma/seed.ts
+```
+
+5. Start the backend (dev mode with hot-reload):
+
+```sh
+npm run dev
+# http://localhost:3010
+```
+
+6. Start the frontend:
+
+```sh
+cd ../frontend && npm start
+# http://localhost:3000
+```
 
 ## Docker and PostgreSQL
 
-This project uses Docker to run a PostgreSQL database. Here's how to set it up:
+This project uses Docker Compose to run PostgreSQL. Connection details (replace with your `.env` values):
 
-Install Docker on your machine if you haven't done so already. You can download it from here.
-Navigate to the root directory of the project in your terminal.
-Run the following command to start the Docker container:
+- Host: `localhost`
+- Port: `5432`
+- User: `postgres`
+- Password: `password`
+- Database: `mydatabase`
 
-```
-docker-compose up -d
-```
-This will start a PostgreSQL database in a Docker container. The -d flag runs the container in detached mode, which means it runs in the background.
-
-To access the PostgreSQL database, you can use any PostgreSQL client with the following connection details:
-
-- Host: localhost
-- Port: 5432
-- User: postgres
-- Password: password
-- Database: mydatabase
-  
-Please replace User, Password, and Database with the actual username, password, and database name specified in your .env file.
-
-To stop the Docker container, run the following command:
-
-```
-docker-compose down
-```
-To generate the database using Prisma, follow these steps:
-
-1. Make sure that the .env file in the root directory of the backend contains the DATABASE_URL variable with the correct connection string to your PostgreSQL database. If it doesn’t work, try replacing the full URL directly in schema.prisma, in the url variable.
-
-2. Open a terminal and navigate to the backend directory where the schema.prisma and seed.ts files are located.
-
-3. Run the following commands to generate the Prisma structure, apply migrations to your database, and populate it with sample data:
-
-```
-npx prisma generate
-npx prisma migrate dev
-ts-node seed.ts
+```sh
+docker-compose up -d    # start
+docker-compose down     # stop
 ```
 
-Once you have completed all the steps, you should be able to save new candidates, both via web and via API, view them in the database, and retrieve them using GET by ID.
+## Available API Endpoints
 
-```
+| Method | Route                          | Description                                      |
+|--------|--------------------------------|--------------------------------------------------|
+| GET    | `/`                            | Healthcheck                                      |
+| POST   | `/candidates`                  | Create a new candidate                           |
+| GET    | `/candidates/:id`              | Get a candidate by ID                            |
+| GET    | `/positions/:id/candidates`    | Get all candidates in process for a position     |
+| POST   | `/candidates/:id/stage`        | Update the interview stage of an application     |
+| POST   | `/upload`                      | Upload a CV file (PDF or DOCX only)              |
+
+```json
 POST http://localhost:3010/candidates
 {
     "firstName": "Albert",
@@ -155,134 +139,128 @@ POST http://localhost:3010/candidates
         "fileType": "application/pdf"
     }
 }
+```
+
+## Running tests
+
+```sh
+cd backend && npm test
 ```
 
 --------------------------------------------
 
 # LTI - Sistema de Seguimiento de Talento | ES
 
-Este proyecto es una aplicación full-stack con un frontend en React y un backend en Express usando Prisma como un ORM. El frontend se inicia con Create React App y el backend está escrito en TypeScript.
+LTI (Lean Talent Intelligence) es una aplicación full-stack ATS con frontend en React y backend en Express + TypeScript usando Prisma ORM y PostgreSQL.
 
-## Explicación de Directorios y Archivos
+El backend sigue **Arquitectura Hexagonal (Ports & Adapters)** con patrones DDD tácticos. Los modelos de dominio son clases puras sin dependencias de infraestructura.
 
-- `backend/`: Contiene el código del lado del servidor escrito en Node.js.
-  - `src/`: Contiene el código fuente para el backend.
-    - `index.ts`: El punto de entrada para el servidor backend.
-    - `application/`: Contiene la lógica de aplicación.
-    - `domain/`: Contiene la lógica de negocio.
-    - `infrastructure/`: Contiene código que se comunica con la base de datos.
-    - `presentation/`: Contiene código relacionado con la capa de presentación (como controladores).
-    - `routes/`: Contiene las definiciones de rutas para la API.
-    - `tests/`: Contiene archivos de prueba.
-  - `prisma/`: Contiene el archivo de esquema de Prisma para ORM.
-  - `tsconfig.json`: Archivo de configuración de TypeScript.
-- `frontend/`: Contiene el código del lado del cliente escrito en React.
-  - `src/`: Contiene el código fuente para el frontend.
-  - `public/`: Contiene archivos estáticos como el archivo HTML e imágenes.
-  - `build/`: Contiene la construcción lista para producción del frontend.
-- `.env`: Contiene las variables de entorno.
-- `docker-compose.yml`: Contiene la configuración de Docker Compose para gestionar los servicios de tu aplicación.
-- `README.md`: Este archivo, contiene información sobre el proyecto e instrucciones sobre cómo ejecutarlo.
+## Arquitectura del Backend
+
+```
+src/
+├── application/
+│   ├── services/           # Lógica de negocio — orquesta queries, sin req/res
+│   └── validator.ts        # Validación de entrada (delega a Value Objects)
+├── domain/
+│   ├── models/             # Entidades puras: propiedades + constructor
+│   ├── repositories/       # Interfaces (Ports): ICandidateRepository, etc.
+│   └── valueObjects/       # Email, PhoneNumber, PersonName — auto-validados
+├── infrastructure/
+│   ├── database/           # Singleton PrismaClient (compartido en toda la app)
+│   └── repositories/       # Adapters: PrismaCandidateRepository, etc.
+├── presentation/
+│   └── controllers/        # Capa HTTP: parsea request, mapea errores a códigos
+├── routes/                 # Definición de rutas Express
+└── index.ts                # Punto de entrada: configuración Express y middleware
+```
 
 ## Estructura del Proyecto
 
-El proyecto está dividido en dos directorios principales: `frontend` y `backend`.
-
-### Frontend
-
-El frontend es una aplicación React y sus archivos principales están ubicados en el directorio `src`. El directorio `public` contiene activos estáticos y el directorio `build` contiene la construcción de producción de la aplicación.
-
-### Backend
-
-El backend es una aplicación Express escrita en TypeScript. El directorio `src` contiene el código fuente, dividido en varios subdirectorios:
-
-- `application`: Contiene la lógica de aplicación.
-- `domain`: Contiene los modelos de dominio.
-- `infrastructure`: Contiene código relacionado con la infraestructura.
-- `presentation`: Contiene código relacionado con la capa de presentación.
-- `routes`: Contiene las rutas de la aplicación.
-- `tests`: Contiene las pruebas de la aplicación.
-
-El directorio `prisma` contiene el esquema de Prisma.
+```
+AI4Devs-backend-202603/
+├── backend/
+│   ├── prisma/schema.prisma     # Modelo de datos (12 entidades)
+│   ├── src/                     # Código fuente (ver arquitectura arriba)
+│   ├── api-spec.yaml            # Especificación OpenAPI 3.0
+│   ├── package.json
+│   └── tsconfig.json
+├── frontend/
+│   ├── public/                  # Recursos estáticos
+│   └── src/
+│       ├── components/          # AddCandidateForm, FileUploader, RecruiterDashboard
+│       ├── services/            # Clientes HTTP para la API
+│       └── App.tsx
+├── docker-compose.yml           # Contenedor PostgreSQL
+└── .env                         # Variables de entorno (no subir a git)
+```
 
 ## Primeros Pasos
 
-Para comenzar con este proyecto, sigue estos pasos:
-
 1. Clona el repositorio.
-2. Instala las dependencias para el frontend y el backend:
+2. Instala dependencias:
+
 ```sh
-cd frontend
-npm install
-
-cd ../backend
-npm install
-```
-3. Construye el servidor backend:
-```
-cd backend
-npm run build
-````
-4. Inicia el servidor backend:
-```
-cd backend
-npm start
-```
-5. En una nueva ventana de terminal, construye el servidor frontend:
-```
-cd frontend
-npm run build
-```
-6. Inicia el servidor frontend:
-```
-cd frontend
-npm start
+cd frontend && npm install
+cd ../backend && npm install
 ```
 
-El servidor backend estará corriendo en http://localhost:3010 y el frontend estará disponible en http://localhost:3000.
+3. Inicia la base de datos:
+
+```sh
+docker-compose up -d
+```
+
+4. Configura Prisma:
+
+```sh
+cd backend
+npx prisma generate
+npx prisma migrate dev
+ts-node prisma/seed.ts
+```
+
+5. Inicia el backend (modo desarrollo con hot-reload):
+
+```sh
+npm run dev
+# http://localhost:3010
+```
+
+6. Inicia el frontend:
+
+```sh
+cd ../frontend && npm start
+# http://localhost:3000
+```
 
 ## Docker y PostgreSQL
 
-Este proyecto usa Docker para ejecutar una base de datos PostgreSQL. Así es cómo ponerlo en marcha:
+El proyecto usa Docker Compose para levantar PostgreSQL. Credenciales (reemplaza con los valores de tu `.env`):
 
-Instala Docker en tu máquina si aún no lo has hecho. Puedes descargarlo desde aquí.
-Navega al directorio raíz del proyecto en tu terminal.
-Ejecuta el siguiente comando para iniciar el contenedor Docker:
-```
-docker-compose up -d
-```
-Esto iniciará una base de datos PostgreSQL en un contenedor Docker. La bandera -d corre el contenedor en modo separado, lo que significa que se ejecuta en segundo plano.
+- Host: `localhost`
+- Port: `5432`
+- User: `postgres`
+- Password: `password`
+- Database: `mydatabase`
 
-Para acceder a la base de datos PostgreSQL, puedes usar cualquier cliente PostgreSQL con los siguientes detalles de conexión:
- - Host: localhost
- - Port: 5432
- - User: postgres
- - Password: password
- - Database: mydatabase
-
-Por favor, reemplaza User, Password y Database con el usuario, la contraseña y el nombre de la base de datos reales especificados en tu archivo .env.
-
-Para detener el contenedor Docker, ejecuta el siguiente comando:
-```
-docker-compose down
+```sh
+docker-compose up -d    # iniciar
+docker-compose down     # detener
 ```
 
-Para generar la base de datos utilizando Prisma, sigue estos pasos:
+## Endpoints disponibles
 
-1. Asegúrate de que el archivo `.env` en el directorio raíz del backend contenga la variable `DATABASE_URL` con la cadena de conexión correcta a tu base de datos PostgreSQL. Si no te funciona, prueba a reemplazar la URL completa directamente en `schema.prisma`, en la variable `url`.
+| Método | Ruta                           | Descripción                                              |
+|--------|--------------------------------|----------------------------------------------------------|
+| GET    | `/`                            | Healthcheck                                              |
+| POST   | `/candidates`                  | Crear un nuevo candidato                                 |
+| GET    | `/candidates/:id`              | Obtener un candidato por ID                              |
+| GET    | `/positions/:id/candidates`    | Candidatos en proceso para una posición (vista Kanban)   |
+| POST   | `/candidates/:id/stage`        | Actualizar la fase de entrevista de una candidatura      |
+| POST   | `/upload`                      | Subir un fichero de CV (solo PDF o DOCX)                 |
 
-2. Abre una terminal y navega al directorio del backend donde se encuentra el archivo `schema.prisma` y `seed.ts`.
-
-3. Ejecuta los siguientes comandos para generar la estructura de prisma, las migraciones a tu base de datos y poblarla con datos de ejemplo:
-```
-npx prisma generate
-npx prisma migrate dev
-ts-node seed.ts
-```
-
-Una vez has dado todos los pasos, deberías poder guardar nuevos candidatos, tanto via web, como via API, verlos en la base de datos y obtenerlos mediante GET por id.
-
-```
+```json
 POST http://localhost:3010/candidates
 {
     "firstName": "Albert",
@@ -314,3 +292,8 @@ POST http://localhost:3010/candidates
 }
 ```
 
+## Ejecutar tests
+
+```sh
+cd backend && npm test
+```
