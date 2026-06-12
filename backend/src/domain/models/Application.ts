@@ -50,4 +50,11 @@ export class Application {
         if (!data) return null;
         return new Application(data);
     }
+
+    static async findWithPosition(id: number) {
+        return prisma.application.findUnique({
+            where: { id },
+            include: { position: { select: { interviewFlowId: true } } },
+        });
+    }
 }
