@@ -224,6 +224,51 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /candidates/{id}/stage:
+    put:
+      summary: Update candidate interview stage
+      description: Moves a candidate's application to a different interview step. The step must belong to the interview flow of the application's position.
+      tags: [Candidates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Application ID
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStageRequest'
+      responses:
+        '200':
+          description: Application updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationResponse'
+        '400':
+          description: Invalid application ID or interview step ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Application not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Interview step does not belong to the position's interview flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   schemas:
     CandidateRow:
@@ -240,11 +285,43 @@ components:
           type: number
           nullable: true
           example: 4.5
+    UpdateStageRequest:
+      type: object
+      required: [interviewStepId]
+      properties:
+        interviewStepId:
+          type: integer
+          minimum: 1
+          example: 3
+    ApplicationResponse:
+      type: object
+      required: [id, positionId, candidateId, currentInterviewStep, applicationDate]
+      properties:
+        id:
+          type: integer
+          example: 1
+        positionId:
+          type: integer
+          example: 2
+        candidateId:
+          type: integer
+          example: 5
+        currentInterviewStep:
+          type: integer
+          example: 3
+        applicationDate:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:00:00.000Z"
+        notes:
+          type: string
+          nullable: true
+          example: null
     Error:
       type: object
       required: [message]
       properties:
         message:
           type: string
-          example: "Position not found"
+          example: "Application not found"
 
