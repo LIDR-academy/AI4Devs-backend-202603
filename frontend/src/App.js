@@ -2,14 +2,16 @@ import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import RecruiterDashboard from './components/RecruiterDashboard';
-import AddCandidate from './components/AddCandidateForm'; // Asegúrate de tener este componente
+import AddCandidate from './components/AddCandidateForm';
+import CandidateList from './components/CandidateList';
 
 const App = () => {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<RecruiterDashboard />} />
-        <Route path="/add-candidate" element={<AddCandidate />} /> {/* Agrega esta línea */}
+        <Route path="/add-candidate" element={<AddCandidate />} />
+        <Route path="/candidates" element={<CandidateList />} />
       </Routes>
     </BrowserRouter>
   );

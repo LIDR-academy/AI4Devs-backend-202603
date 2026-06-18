@@ -50,4 +50,44 @@ export class Application {
         if (!data) return null;
         return new Application(data);
     }
+
+    static async findByPositionId(positionId: number) {
+        return prisma.application.findMany({
+            where: { positionId },
+            include: {
+                candidate: {
+                    select: { firstName: true, lastName: true }
+                },
+                interviewStep: {
+                    select: { id: true, name: true, orderIndex: true }
+                },
+                interviews: {
+                    select: { score: true }
+                }
+            }
+        });
+    }
+
+    static async updateStage(applicationId: number, newInterviewStepId: number) {
+        return prisma.application.update({
+            where: { id: applicationId },
+            data: { currentInterviewStep: newInterviewStepId },
+            include: {
+                interviewStep: {
+                    select: { id: true, name: true, orderIndex: true }
+                }
+            }
+        });
+    }
+
+    static async findWithPosition(id: number) {
+        return prisma.application.findUnique({
+            where: { id },
+            include: {
+                position: {
+                    select: { interviewFlowId: true }
+                }
+            }
+        });
+    }
 }
