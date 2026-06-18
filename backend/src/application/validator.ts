@@ -1,6 +1,6 @@
 const NAME_REGEX = /^[a-zA-ZñÑáéíóúÁÉÍÓÚ ]+$/;
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const PHONE_REGEX = /^(6|7|9)\d{8}$/;
+const PHONE_REGEX = /^\+?[\d\s\-().]{7,15}$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 //Length validations according to the database schema

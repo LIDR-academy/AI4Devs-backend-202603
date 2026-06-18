@@ -3,6 +3,10 @@ import { validateCandidateData } from '../validator';
 import { Education } from '../../domain/models/Education';
 import { WorkExperience } from '../../domain/models/WorkExperience';
 import { Resume } from '../../domain/models/Resume';
+import { Application } from '../../domain/models/Application';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export const addCandidate = async (candidateData: any) => {
     try {
@@ -56,10 +60,44 @@ export const addCandidate = async (candidateData: any) => {
 
 export const findCandidateById = async (id: number): Promise<Candidate | null> => {
     try {
-        const candidate = await Candidate.findOne(id); // Cambio aquí: pasar directamente el id
+        const candidate = await Candidate.findOne(id);
         return candidate;
     } catch (error) {
         console.error('Error al buscar el candidato:', error);
         throw new Error('Error al recuperar el candidato');
     }
+};
+
+export const updateApplicationStage = async (applicationId: number, newInterviewStepId: number) => {
+    const application = await Application.findWithPosition(applicationId);
+    if (!application) {
+        const error: any = new Error('Postulación no encontrada');
+        error.code = 'NOT_FOUND';
+        throw error;
+    }
+
+    const step = await prisma.interviewStep.findUnique({ where: { id: newInterviewStepId } });
+    if (!step) {
+        const error: any = new Error('Etapa de entrevista no encontrada');
+        error.code = 'NOT_FOUND';
+        throw error;
+    }
+
+    if (step.interviewFlowId !== application.position.interviewFlowId) {
+        const error: any = new Error('La etapa indicada no pertenece al flujo de entrevistas de esta posición');
+        error.code = 'VALIDATION_ERROR';
+        throw error;
+    }
+
+    const updated = await Application.updateStage(applicationId, newInterviewStepId);
+
+    return {
+        applicationId: updated.id,
+        candidateId: updated.candidateId,
+        newInterviewStep: {
+            id: updated.interviewStep.id,
+            name: updated.interviewStep.name,
+            orderIndex: updated.interviewStep.orderIndex,
+        },
+    };
 };
